@@ -5,6 +5,8 @@
  * @link http://www.larva.com.cn/
  */
 
+declare (strict_types = 1);
+
 namespace Larva\Transaction\Models;
 
 use Carbon\CarbonInterface;
@@ -110,7 +112,7 @@ class Charge extends Model
     /**
      * 新增前事件
      * @param Model $model
-     * @return mixed|void
+     * @return void
      */
     public static function onBeforeInsert($model)
     {
@@ -245,7 +247,7 @@ class Charge extends Model
         if ($this->paid) {
             return true;
         }
-        $paid = (bool)$this->update(['transaction_no' => $transactionNo, 'time_paid' => $this->freshTimestamp(), 'paid' => true]);
+        $paid = $this->save(['transaction_no' => $transactionNo, 'time_paid' => $this->freshTimestamp(), 'paid' => true]);
         Event::trigger(new ChargeShipped($this));
         return $paid;
     }
