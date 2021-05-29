@@ -1,0 +1,31 @@
+{
+  "name": "larva/think-transaction",
+  "description": "This is a transaction.",
+  "keywords": [ "think", "transaction", "larva" ],
+  "type": "library",
+  "license": "MIT",
+  "require": {
+    "ext-bcmath": "*",
+    "ext-json": "*",
+    "yansongda/pay": "^2.9"
+  },
+  "autoload": {
+    "psr-4": {
+      "Larva\\Transaction\\": "src"
+    }
+  },
+  "extra": {
+    "branch-alias": {
+      "dev-master": "1.0-dev"
+    },
+    "think": {
+      "services": [
+        "Larva\\Transaction\\TransactionService"
+      ],
+      "config":{
+        "sms": "config/transaction.php"
+      }
+    }
+  },
+  "prefer-stable": true
+}
