@@ -5,12 +5,19 @@
  * @link http://www.larva.com.cn/
  */
 
-declare (strict_types = 1);
+declare (strict_types=1);
 
 namespace Larva\Transaction\Models;
 
 use Carbon\CarbonInterface;
+use Exception;
+use Larva\Transaction\Events\TransferFailure;
+use Larva\Transaction\Events\TransferShipped;
+use Larva\Transaction\Transaction;
+use think\facade\Event;
+use think\facade\Log;
 use think\Model;
+use think\model\relation\BelongsTo;
 use think\model\relation\MorphTo;
 
 /**
@@ -55,6 +62,18 @@ class Transfer extends Model
     protected $key = 'id';
 
     /**
+     * 这个属性应该被转换为原生类型.
+     *
+     * @var array
+     */
+    protected $type = [
+        'id' => 'string',
+        'amount' => 'int',
+        'metadata' => 'array',
+        'extra' => 'array'
+    ];
+
+    /**
      * 是否需要自动写入时间戳 如果设置为字符串 则表示时间字段的类型
      * @var bool|string
      */
@@ -74,8 +93,8 @@ class Transfer extends Model
 
     /**
      * 新增前事件
-     * @param Model $model
-     * @return mixed|void
+     * @param Transfer $model
+     * @return void
      */
     public static function onBeforeInsert($model)
     {
@@ -87,11 +106,15 @@ class Transfer extends Model
 
     /**
      * 新增后事件
-     * @param Model $model
+     * @param Transfer $model
      */
     public static function onAfterInsert($model)
     {
-        $model->send();
+        try {
+            $model->send();
+        } catch (Exception $e) {
+            Log::error($e->getMessage());
+        }
     }
 
     /**
@@ -104,10 +127,29 @@ class Transfer extends Model
     }
 
     /**
-     * 生成流水号
-     * @return int
+     * 关联用户模型
+     * @return BelongsTo
      */
-    protected function generateId()
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(config('transaction.user'), 'user_id');
+    }
+
+    /**
+     * 查询已付款的
+     * @param  $query
+     * @return mixed
+     */
+    public function scopePaid($query)
+    {
+        return $query->where('status', 'paid');
+    }
+
+    /**
+     * 生成流水号
+     * @return string
+     */
+    protected function generateId(): string
     {
         $i = rand(0, 9999);
         do {
@@ -115,9 +157,106 @@ class Transfer extends Model
                 $i = 0;
             }
             $i++;
-            $id = time() . str_pad($i, 4, '0', STR_PAD_LEFT);
+            $id = time() . str_pad((string)$i, 4, '0', STR_PAD_LEFT);
             $row = static::where($this->key, $id)->exists();
         } while ($row);
         return $id;
+    }
+
+    /**
+     * 是否已付款
+     * @return boolean
+     */
+    public function getPaidAttr(): bool
+    {
+        return $this->status == static::STATUS_PAID;
+    }
+
+    /**
+     * 是否待发送
+     * @return boolean
+     */
+    public function getScheduledAttr(): bool
+    {
+        return $this->status == static::STATUS_SCHEDULED;
+    }
+
+    /**
+     * 设置已付款
+     * @param string $transactionNo
+     * @param array $params
+     * @return bool
+     */
+    public function setPaid(string $transactionNo, array $params = []): bool
+    {
+        if ($this->paid) {
+            return true;
+        }
+        $paid = $this->save(['transaction_no' => $transactionNo, 'transferred_at' => $this->freshTimestamp(), 'status' => static::STATUS_PAID, 'extra' => $params]);
+        Event::trigger(new TransferShipped($this));
+        return $paid;
+    }
+
+    /**
+     * 设置提现错误
+     * @param string $code
+     * @param string $msg
+     * @return bool
+     */
+    public function setFailure(string $code, string $msg): bool
+    {
+        $res = $this->save(['status' => self::STATUS_FAILED, 'failure_code' => $code, 'failure_msg' => $msg]);
+        Event::trigger(new TransferFailure($this));
+        return $res;
+    }
+
+    /**
+     * 主动发送付款请求到网关
+     * @return Transfer
+     * @throws Exception
+     */
+    public function send(): Transfer
+    {
+        if ($this->status == static::STATUS_SCHEDULED) {
+            $channel = Transaction::getChannel($this->channel);
+            if ($this->channel == Transaction::CHANNEL_WECHAT) {
+                $config = [
+                    'partner_trade_no' => $this->id,
+                    'openid' => $this->recipient_id,
+                    'check_name' => 'NO_CHECK',
+                    'amount' => $this->amount,
+                    'desc' => $this->description,
+                    'type' => $this->extra['type'],
+                ];
+                if (isset($this->extra['user_name'])) {
+                    $config['check_name'] = 'FORCE_CHECK';
+                    $config['re_user_name'] = $this->extra['user_name'];
+                }
+                try {
+                    $response = $channel->transfer($config);
+                    $this->setPaid($response->payment_no, $response->toArray());
+                } catch (Exception $exception) {//设置付款失败
+                    $this->setFailure('FAIL', $exception->getMessage());
+                }
+            } else if ($this->channel == Transaction::CHANNEL_ALIPAY) {
+                $config = [
+                    'out_biz_no' => $this->id,
+                    'payee_type' => $this->extra['recipient_account_type'],
+                    'payee_account' => $this->recipient_id,
+                    'amount' => $this->amount / 100,
+                    'remark' => $this->description,
+                ];
+                if (isset($this->extra['recipient_name'])) {
+                    $config['payee_real_name'] = $this->extra['recipient_name'];
+                }
+                try {
+                    $response = $channel->transfer($config);
+                    $this->setPaid($response->payment_no, $response->toArray());
+                } catch (Exception $exception) {//设置提现失败
+                    $this->setFailure('FAIL', $exception->getMessage());
+                }
+            }
+        }
+        return $this;
     }
 }

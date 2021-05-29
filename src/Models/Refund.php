@@ -5,7 +5,7 @@
  * @link http://www.larva.com.cn/
  */
 
-declare (strict_types = 1);
+declare (strict_types=1);
 
 namespace Larva\Transaction\Models;
 
@@ -15,6 +15,7 @@ use Larva\Transaction\Events\RefundFailure;
 use Larva\Transaction\Events\RefundSuccess;
 use Larva\Transaction\Transaction;
 use think\facade\Event;
+use think\facade\Log;
 use think\Model;
 use think\model\relation\BelongsTo;
 use think\model\relation\MorphTo;
@@ -64,6 +65,19 @@ class Refund extends Model
     protected $key = 'id';
 
     /**
+     * 这个属性应该被转换为原生类型.
+     *
+     * @var array
+     */
+    protected $type = [
+        'id' => 'string',
+        'amount' => 'int',
+        'succeed' => 'boolean',
+        'metadata' => 'array',
+        'extra' => 'array'
+    ];
+
+    /**
      * 是否需要自动写入时间戳 如果设置为字符串 则表示时间字段的类型
      * @var bool|string
      */
@@ -83,8 +97,8 @@ class Refund extends Model
 
     /**
      * 新增前事件
-     * @param Model $model
-     * @return mixed|void
+     * @param Refund $model
+     * @return void
      */
     public static function onBeforeInsert($model)
     {
@@ -96,11 +110,15 @@ class Refund extends Model
 
     /**
      * 新增后事件
-     * @param Model $model
+     * @param Refund $model
      */
     public static function onAfterInsert($model)
     {
-        $model->send();
+        try {
+            $model->send();
+        } catch (Exception $e) {
+            Log::error($e->getMessage());
+        }
     }
 
     /**
@@ -110,6 +128,15 @@ class Refund extends Model
     public function source(): MorphTo
     {
         return $this->morphTo();
+    }
+
+    /**
+     * 关联用户模型
+     * @return BelongsTo
+     */
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(config('transaction.user'), 'user_id');
     }
 
     /**
@@ -133,7 +160,7 @@ class Refund extends Model
                 $i = 0;
             }
             $i++;
-            $id = time() . str_pad($i, 4, '0', STR_PAD_LEFT);
+            $id = time() . str_pad((string)$i, 4, '0', STR_PAD_LEFT);
             $row = static::where($this->key, '=', $id)->exists();
         } while ($row);
         return $id;
@@ -165,8 +192,8 @@ class Refund extends Model
      */
     public function setFailure(string $code, string $msg): bool
     {
-        $succeed = (bool)$this->update(['status' => self::STATUS_FAILED, 'failure_code' => $code, 'failure_msg' => $msg]);
-        $this->charge->update(['amount_refunded' => bcsub($this->charge->amount_refunded, $this->amount)]);//可退款金额，减回去
+        $succeed = $this->save(['status' => self::STATUS_FAILED, 'failure_code' => $code, 'failure_msg' => $msg]);
+        $this->charge->save(['amount_refunded' => $this->charge->amount_refunded - $this->amount]);//可退款金额，减回去
         Event::trigger(new RefundFailure($this));
         return $succeed;
     }
@@ -182,7 +209,7 @@ class Refund extends Model
         if ($this->succeed) {
             return true;
         }
-        $this->update(['status' => self::STATUS_SUCCEEDED, 'transaction_no' => $transactionNo, 'time_succeed' => $this->freshTimestamp(), 'extra' => $params]);
+        $this->save(['status' => self::STATUS_SUCCEEDED, 'transaction_no' => $transactionNo, 'time_succeed' => $this->freshTimestamp(), 'extra' => $params]);
         Event::trigger(new RefundSuccess($this));
         return $this->succeed;
     }
@@ -194,7 +221,7 @@ class Refund extends Model
      */
     public function send(): Refund
     {
-        $this->charge->update(['refunded' => true, 'amount_refunded' => $this->charge->amount_refunded + $this->amount]);
+        $this->charge->save(['refunded' => true, 'amount_refunded' => $this->charge->amount_refunded + $this->amount]);
         $channel = Transaction::getChannel($this->charge->channel);
         if ($this->charge->channel == Transaction::CHANNEL_WECHAT) {
             $refundAccount = 'REFUND_SOURCE_RECHARGE_FUNDS';
@@ -213,7 +240,7 @@ class Refund extends Model
             ];
             try {
                 $response = $channel->refund($order);
-                $this->setRefunded($response->transaction_id, $response);
+                $this->setRefunded($response->transaction_id, $response->toArray());
             } catch (Exception $exception) {//设置失败
                 $this->setFailure('FAIL', $exception->getMessage());
             }
@@ -222,13 +249,13 @@ class Refund extends Model
                 'out_trade_no' => $this->charge->id,
                 'trade_no' => $this->charge->transaction_no,
                 'refund_currency' => $this->charge->currency,
-                'refund_amount' => bcdiv($this->amount, 100, 2),
+                'refund_amount' => $this->amount / 100,
                 'refund_reason' => '退款',
                 'out_request_no' => $this->id
             ];
             try {
                 $response = $channel->refund($order);
-                $this->setRefunded($response->trade_no, $response);
+                $this->setRefunded($response->trade_no, $response->toArray());
             } catch (Exception $exception) {//设置失败
                 $this->setFailure('FAIL', $exception->getMessage());
             }

@@ -5,7 +5,7 @@
  * @link http://www.larva.com.cn/
  */
 
-declare (strict_types = 1);
+declare (strict_types=1);
 
 namespace Larva\Transaction\Models;
 
@@ -21,6 +21,7 @@ use Symfony\Component\HttpFoundation\Response;
 use think\facade\Event;
 use think\facade\Log;
 use think\Model;
+use think\model\relation\BelongsTo;
 use think\model\relation\HasMany;
 use think\model\relation\MorphTo;
 use Yansongda\Pay\Exceptions\GatewayException;
@@ -39,7 +40,7 @@ use Yansongda\Supports\Collection;
  * @property string $type  支付类型
  * @property string $subject 支付标题
  * @property string $body 支付内容
- * @property string $order_id 订单ID
+ * @property string $source_id 订单ID
  * @property float $amount 支付金额，单位分
  * @property string $currency 支付币种
  * @property boolean $paid 是否支付成功
@@ -53,6 +54,10 @@ use Yansongda\Supports\Collection;
  * @property array $credential 客户端支付凭证
  * @property array $metadata 元数据
  * @property array $extra 渠道数据
+ *
+ * @property \app\model\User $user
+ * @property Model $source
+ * @property Refund $refunds
  *
  * @property CarbonInterface $time_paid 付款时间
  * @property CarbonInterface $deleted_at 软删除时间
@@ -98,6 +103,7 @@ class Charge extends Model
      * @var array
      */
     protected $type = [
+        'id' => 'string',
         'amount' => 'int',
         'paid' => 'boolean',
         'refunded' => 'boolean',
@@ -111,7 +117,7 @@ class Charge extends Model
 
     /**
      * 新增前事件
-     * @param Model $model
+     * @param Charge $model
      * @return void
      */
     public static function onBeforeInsert($model)
@@ -123,7 +129,7 @@ class Charge extends Model
 
     /**
      * 新增后事件
-     * @param Model $model
+     * @param Charge $model
      */
     public static function onAfterInsert($model)
     {
@@ -143,7 +149,7 @@ class Charge extends Model
      */
     public function getCredential(string $channel, string $type): array
     {
-        $this->update(['channel' => $channel, 'type' => $type]);
+        $this->save(['channel' => $channel, 'type' => $type]);
         $this->prePay();
         $this->refresh();
         return $this->credential;
@@ -165,6 +171,15 @@ class Charge extends Model
     public function source(): MorphTo
     {
         return $this->morphTo();
+    }
+
+    /**
+     * 关联用户模型
+     * @return BelongsTo
+     */
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(config('transaction.user'), 'user_id');
     }
 
     /**
@@ -190,11 +205,11 @@ class Charge extends Model
 
     /**
      * 获取可退款钱数
-     * @return string
+     * @return float|int
      */
-    public function getRefundableAttr(): string
+    public function getRefundableAttr()
     {
-        return bcsub($this->amount, $this->amount_refunded);
+        return $this->amount - $this->amount_refunded;
     }
 
     /**
@@ -218,7 +233,7 @@ class Charge extends Model
                 $i = 0;
             }
             $i++;
-            $id = time() . str_pad($i, 4, '0', STR_PAD_LEFT);
+            $id = time() . str_pad((string)$i, 4, '0', STR_PAD_LEFT);
             $row = static::where($this->key, '=', $id)->exists();
         } while ($row);
         return $id;
@@ -232,7 +247,7 @@ class Charge extends Model
      */
     public function setFailure(string $code, string $msg): bool
     {
-        $status = (bool)$this->update(['failure_code' => $code, 'failure_msg' => $msg]);
+        $status = $this->save(['failure_code' => $code, 'failure_msg' => $msg]);
         Event::trigger(new ChargeFailure($this));
         return $status;
     }
@@ -260,7 +275,7 @@ class Charge extends Model
     public function setClose(): bool
     {
         if ($this->paid) {
-            $this->update(['failure_code' => 'FAIL', 'failure_msg' => '已支付，无法撤销']);
+            $this->save(['failure_code' => 'FAIL', 'failure_msg' => '已支付，无法撤销']);
             return false;
         } else if ($this->reversed) {//已经撤销
             return true;
@@ -269,7 +284,7 @@ class Charge extends Model
             try {
                 if ($channel->close($this->id)) {
                     Event::trigger(new ChargeClosed($this));
-                    $this->update(['reversed' => true, 'credential' => []]);
+                    $this->save(['reversed' => true, 'credential' => []]);
                     return true;
                 }
                 return false;
@@ -295,9 +310,9 @@ class Charge extends Model
                 'amount' => $this->amount,
                 'description' => $description,
                 'charge_id' => $this->id,
-                'charge_order_id' => $this->order_id,
+                'charge_order_id' => $this->source_id,
             ]);
-            $this->update(['refunded' => true]);
+            $this->save(['refunded' => true]);
             return $refund;
         }
         throw new Exception ('Not paid, no refund.');
@@ -323,7 +338,7 @@ class Charge extends Model
             }
             $order['notify_url'] = url('transaction.notify.charge', ['channel' => Transaction::CHANNEL_WECHAT]);
         } else if ($this->channel == Transaction::CHANNEL_ALIPAY) {
-            $order['total_amount'] = bcdiv($this->amount, 100, 2);//总钱数，单位元
+            $order['total_amount'] = $this->amount / 100;//总钱数，单位元
             $order['subject'] = $this->subject;
             if ($this->body) {
                 $order['body'] = $this->body;
@@ -353,6 +368,6 @@ class Charge extends Model
                 $credential = ['html' => $credential->getContent()];
             }
         }
-        $this->update(['credential' => $credential]);
+        $this->save(['credential' => $credential]);
     }
 }

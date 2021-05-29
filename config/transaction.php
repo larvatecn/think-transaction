@@ -1,6 +1,8 @@
 <?php
 
 return [
+    //用户模型
+    'user' => User::class,
     'alipay' => [
         // 支付宝分配的 APPID
         'app_id' => env('ALI_APP_ID', ''),
