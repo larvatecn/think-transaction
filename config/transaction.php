@@ -1,5 +1,7 @@
 <?php
 
+use app\model\User;
+
 return [
     //用户模型
     'user' => User::class,
@@ -21,7 +23,7 @@ return [
 
         // optional，默认 warning；日志路径为：sys_get_temp_dir().'/logs/yansongda.pay.log'
         'log' => [
-            'file' => storage_path('logs/alipay.log'),
+            'file' => runtime_path('logs/alipay.log'),
             //  'level' => 'debug'
             //  'type' => 'single', // optional, 可选 daily.
             //  'max_file' => 30,
@@ -58,7 +60,7 @@ return [
 
         // optional，默认 warning；日志路径为：sys_get_temp_dir().'/logs/yansongda.pay.log'
         'log' => [
-            'file' => storage_path('logs/wechat.log'),
+            'file' => runtime_path('logs/wechat.log'),
             //  'level' => 'debug'
             //  'type' => 'single', // optional, 可选 daily.
             //  'max_file' => 30,
