@@ -1,5 +1,6 @@
 <?php
 
+use Larva\Transaction\Models\Refund;
 use think\migration\Migrator;
 use think\migration\db\Column;
 
@@ -33,7 +34,7 @@ class CreateTransactionRefundsTable extends Migrator
             ->addColumn('user_id', 'biginteger', ['signed' => true, 'null' => true])
             ->addColumn('charge_id', 'string', ['limit' => 64, 'null' => true])
             ->addColumn('amount', 'integer', ['signed' => true])
-            ->addColumn('status', 'string', ['null' => true, 'default' => \Larva\Transaction\Models\Refund::STATUS_PENDING])
+            ->addColumn('status', 'string', ['null' => true, 'default' => Refund::STATUS_PENDING])
             ->addColumn('description', 'string', ['limit' => 500, 'null' => true])
             ->addColumn('failure_code', 'string', ['null' => true])
             ->addColumn('failure_msg', 'string', ['null' => true])

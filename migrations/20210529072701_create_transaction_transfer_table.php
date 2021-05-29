@@ -1,5 +1,6 @@
 <?php
 
+use Larva\Transaction\Models\Transfer;
 use think\migration\Migrator;
 use think\migration\db\Column;
 
@@ -31,7 +32,7 @@ class CreateTransactionTransferTable extends Migrator
         $table = $this->table('transaction_transfer', ['id' => false, 'primary_key' => 'id']);
         $table->addColumn('id', 'string', ['limit' => 64])
             ->addColumn('channel', 'string', ['limit' => 64, 'null' => true])
-            ->addColumn('status', 'string', ['limit' => 15, 'null' => true, 'default' => \Larva\Transaction\Models\Transfer::STATUS_SCHEDULED])
+            ->addColumn('status', 'string', ['limit' => 15, 'null' => true, 'default' => Transfer::STATUS_SCHEDULED])
             ->addMorphs('source')//多态
             ->addColumn('amount', 'integer', ['signed' => true])
             ->addColumn('currency', 'string', ['limit' => 3, 'default' => 'CNY'])
