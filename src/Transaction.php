@@ -24,7 +24,7 @@ class Transaction
      * @return \Yansongda\Pay\Gateways\Alipay|\Yansongda\Pay\Gateways\Wechat
      * @throws \Exception
      */
-    public static function getChannel($channel)
+    public static function getChannel(string $channel)
     {
         if ($channel == static::CHANNEL_WECHAT) {
             return Pay::wechat(config('transaction.wechat'));

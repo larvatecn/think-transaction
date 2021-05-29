@@ -313,7 +313,7 @@ class Charge extends Model
             if ($this->time_expire) {
                 $order['time_expire'] = $this->time_expire->format('YmdHis');
             }
-            $order['notify_url'] = route('transaction.notify.charge', ['channel' => Transaction::CHANNEL_WECHAT]);
+            $order['notify_url'] = url('transaction.notify.charge', ['channel' => Transaction::CHANNEL_WECHAT]);
         } else if ($this->channel == Transaction::CHANNEL_ALIPAY) {
             $order['total_amount'] = bcdiv($this->amount, 100, 2);//总钱数，单位元
             $order['subject'] = $this->subject;
@@ -323,9 +323,9 @@ class Charge extends Model
             if ($this->time_expire) {
                 $order['time_expire'] = $this->time_expire;
             }
-            $order['notify_url'] = route('transaction.notify.charge', ['channel' => Transaction::CHANNEL_ALIPAY]);
+            $order['notify_url'] = url('transaction.notify.charge', ['channel' => Transaction::CHANNEL_ALIPAY]);
             if ($this->type == 'wap') {
-                $order['return_url'] = route('transaction.callback.charge', ['channel' => Transaction::CHANNEL_ALIPAY]);
+                $order['return_url'] = url('transaction.callback.charge', ['channel' => Transaction::CHANNEL_ALIPAY]);
             }
         }
         // 获取支付凭证

@@ -7,6 +7,7 @@
 
 namespace Larva\Transaction\Models;
 
+use Carbon\CarbonInterface;
 use Exception;
 use Larva\Transaction\Events\RefundFailure;
 use Larva\Transaction\Events\RefundSuccess;
@@ -182,7 +183,7 @@ class Refund extends Model
                 'refund_fee_type' => $this->charge->currency,
                 'refund_desc' => $this->description,
                 'refund_account' => $refundAccount,
-                'notify_url' => route('transaction.notify.refund', ['channel' => Transaction::CHANNEL_WECHAT]),
+                'notify_url' => url('transaction.notify.refund', ['channel' => Transaction::CHANNEL_WECHAT]),
             ];
             try {
                 $response = $channel->refund($order);
