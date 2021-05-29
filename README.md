@@ -109,3 +109,78 @@ class Order extends Model {
     }
 }
 ```
+
+```php
+$order = Order::create([
+//你创建订单的参数
+]);
+//获取付款凭证 数组
+$credential = $order->charge->getCredential();
+```
+
+创建一个事件监听器 `php think make:subscribe ChargeShipped`
+
+```php
+<?php
+declare (strict_types=1);
+
+namespace app\subscribe;
+
+use think\Event;
+
+class ChargeShipped
+{
+
+    public function onChargeShipped($charge)
+    {
+        if ($charge->source instanceof Order) {
+            $charge->source->setSucceeded();
+        }
+    }
+
+    public function onChargeClosed($charge)
+    {
+
+    }
+
+    public function onChargeFailure($charge)
+    {
+
+    }
+
+
+    public function subscribe(Event $event)
+    {
+        $event->listen(\Larva\Transaction\Events\ChargeClosed::class, [$this, 'onChargeClosed']);
+        $event->listen(\Larva\Transaction\Events\ChargeFailure::class, [$this, 'onChargeFailure']);
+        $event->listen(\Larva\Transaction\Events\ChargeShipped::class, [$this, 'onChargeShipped']);
+    }
+}
+```
+
+在你 `app/event.php` 中加入订阅器如：
+
+```php
+<?php
+// 事件定义文件
+return [
+    'bind' => [
+
+    ],
+
+    'listen' => [
+        'AppInit' => [],
+        'HttpRun' => [],
+        'HttpEnd' => [
+
+        ],
+        'LogLevel' => [],
+        'LogWrite' => [],
+    ],
+
+    'subscribe' => [
+        'app\subscribe\Charge'
+    ],
+];
+
+```
