@@ -31,7 +31,11 @@ composer require larva/think-transaction -vv
 \Larva\Transaction\Events\TransferShipped 企业付款成功事件
 ```
 
-你自己的订单关联
+你自己的订单关联，总体思路是你自己的订单模型或者其他需要用户付款的模型，再模型创建后你应该可以用创建后事件来调用付款；
+需要在前端或者APP端执行付款逻辑的时候，你只需要 `$model->charge->getCredential();`
+就能获取到付款参数，带入对应的SDK即可，比如APP的SDK需要的几个参数，这里都能获取到。
+`\Larva\Transaction\Events\ChargeShipped` 事件你可以监听到付款成功的事件，你只需判断事件的source属性是否是你当前这个模型的实例即可知道是谁触发了付款并且付款成功；
+
 
 ```php
 /**
@@ -39,6 +43,23 @@ composer require larva/think-transaction -vv
  */
 class Order extends Model {
 
+    /**
+     * 新增后会自动触发该事件，这时候就自动创建了付款参数；
+     * @param Order $model
+     */
+    public static function onAfterInsert($model)
+    {
+        $model->charge()->create([
+            'user_id' => $model->user_id,
+            'amount' => $model->amount,//金额单位分
+            'channel' => $model->channel,//付款通道 ，如weixin
+            'subject' => '订单付款',
+            'body' => '订单详情',
+            'client_ip' => $model->client_ip,
+            'type' => $model->type,//交易类型 如 app
+        ]);
+    }
+    
     /**
      * Get the entity's charge.
      *
