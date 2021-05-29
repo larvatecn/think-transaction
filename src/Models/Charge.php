@@ -29,7 +29,7 @@ use Yansongda\Supports\Collection;
 
 /**
  * 支付模型
- * @property int $id
+ * @property string $id
  * @property int $user_id 用户ID
  * @property boolean $reversed 已撤销
  * @property boolean $refunded 已退款
@@ -65,6 +65,12 @@ use Yansongda\Supports\Collection;
 class Charge extends Model
 {
     protected $name = 'transaction_charges';
+
+    /**
+     * 主键值
+     * @var string
+     */
+    protected $key = 'id';
 
     /**
      * 是否需要自动写入时间戳 如果设置为字符串 则表示时间字段的类型

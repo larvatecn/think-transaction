@@ -56,6 +56,30 @@ class Refund extends Model
     protected $name = 'transaction_refunds';
 
     /**
+     * 主键值
+     * @var string
+     */
+    protected $key = 'id';
+
+    /**
+     * 是否需要自动写入时间戳 如果设置为字符串 则表示时间字段的类型
+     * @var bool|string
+     */
+    protected $autoWriteTimestamp = 'datetime';
+
+    /**
+     * 创建时间字段 false表示关闭
+     * @var false|string
+     */
+    protected $createTime = 'created_at';
+
+    /**
+     * 更新时间字段 false表示关闭
+     * @var false|string
+     */
+    protected $updateTime = 'updated_at';
+
+    /**
      * 新增前事件
      * @param Model $model
      * @return mixed|void
