@@ -128,7 +128,7 @@ namespace app\subscribe;
 
 use think\Event;
 
-class ChargeShipped
+class TransactionCharge
 {
 
     public function onChargeShipped($charge)
@@ -179,7 +179,7 @@ return [
     ],
 
     'subscribe' => [
-        'app\subscribe\Charge'
+        'app\subscribe\TransactionCharge'
     ],
 ];
 
