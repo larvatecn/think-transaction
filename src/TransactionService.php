@@ -11,7 +11,7 @@ namespace Larva\Transaction;
 
 use Larva\Transaction\Http\Controllers\NotifyController;
 use Larva\Transaction\Http\Controllers\PaymentController;
-use think\facade\Route;
+use think\Route;
 
 /**
  * Class TransactionService
