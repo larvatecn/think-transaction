@@ -5,9 +5,12 @@
   "type": "library",
   "license": "MIT",
   "require": {
+    "php": "^7.3|^8.0",
     "ext-bcmath": "*",
     "ext-json": "*",
-    "yansongda/pay": "^2.9"
+    "topthink/framework": "^6.0.0",
+    "yansongda/pay": "^2.10",
+    "larva/support": "^1.1"
   },
   "autoload": {
     "psr-4": {
