@@ -21,6 +21,7 @@ use Symfony\Component\HttpFoundation\Response;
 use think\facade\Event;
 use think\facade\Log;
 use think\Model;
+use think\model\concern\SoftDelete;
 use think\model\relation\BelongsTo;
 use think\model\relation\HasMany;
 use think\model\relation\MorphTo;
@@ -71,6 +72,8 @@ use Yansongda\Supports\Collection;
  */
 class Charge extends Model
 {
+    use SoftDelete;
+
     protected $name = 'transaction_charges';
 
     /**
@@ -96,6 +99,12 @@ class Charge extends Model
      * @var false|string
      */
     protected $updateTime = 'updated_at';
+
+    /**
+     * 软删除字段
+     * @var string
+     */
+    protected $deleteTime = 'deleted_at';
 
     /**
      * 这个属性应该被转换为原生类型.

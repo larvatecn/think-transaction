@@ -17,6 +17,7 @@ use Larva\Transaction\Transaction;
 use think\facade\Event;
 use think\facade\Log;
 use think\Model;
+use think\model\concern\SoftDelete;
 use think\model\relation\BelongsTo;
 use think\model\relation\MorphTo;
 
@@ -47,6 +48,8 @@ use think\model\relation\MorphTo;
  */
 class Refund extends Model
 {
+    use SoftDelete;
+
     //退款状态
     const STATUS_PENDING = 'pending';
     const STATUS_SUCCEEDED = 'succeeded';
@@ -94,6 +97,12 @@ class Refund extends Model
      * @var false|string
      */
     protected $updateTime = 'updated_at';
+
+    /**
+     * 软删除字段
+     * @var string
+     */
+    protected $deleteTime = 'deleted_at';
 
     /**
      * 新增前事件

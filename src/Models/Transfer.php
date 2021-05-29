@@ -17,6 +17,7 @@ use Larva\Transaction\Transaction;
 use think\facade\Event;
 use think\facade\Log;
 use think\Model;
+use think\model\concern\SoftDelete;
 use think\model\relation\BelongsTo;
 use think\model\relation\MorphTo;
 
@@ -46,6 +47,7 @@ use think\model\relation\MorphTo;
  */
 class Transfer extends Model
 {
+    use SoftDelete;
 
     //付款状态
     const STATUS_SCHEDULED = 'scheduled';//scheduled: 待发送
@@ -90,6 +92,12 @@ class Transfer extends Model
      * @var false|string
      */
     protected $updateTime = 'updated_at';
+
+    /**
+     * 软删除字段
+     * @var string
+     */
+    protected $deleteTime = 'deleted_at';
 
     /**
      * 新增前事件

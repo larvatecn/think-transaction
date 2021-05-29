@@ -67,7 +67,7 @@ class Order extends Model {
      */
     public function charge()
     {
-        return $this->morphOne(Charge::class, 'order');
+        return $this->morphOne(Charge::class, 'source');
     }
 
     /**
