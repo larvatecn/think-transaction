@@ -11,11 +11,14 @@
 
 - PHP >= 7.3.0
 
-## Installation
+## 安装
 
 ```bash
 composer require larva/think-transaction -vv
 ```
+
+由于 `ThinkPHP` 不支持发布迁移文件到应用目录，所以你需要手动复制迁移文件到你应用的迁移目录后执行迁移；
+迁移文件在 `vendor/larva/think-transaction/migrations` 下；
 
 事件
 ```php
