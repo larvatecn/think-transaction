@@ -9,6 +9,7 @@ declare (strict_types=1);
 
 namespace Larva\Transaction\Models;
 
+use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Exception;
 use Larva\Transaction\Events\ChargeClosed;
@@ -271,7 +272,7 @@ class Charge extends Model
         if ($this->paid) {
             return true;
         }
-        $paid = $this->save(['transaction_no' => $transactionNo, 'time_paid' => $this->freshTimestamp(), 'paid' => true]);
+        $paid = $this->save(['transaction_no' => $transactionNo, 'time_paid' => Carbon::now(), 'paid' => true]);
         Event::trigger(new ChargeShipped($this));
         return $paid;
     }
@@ -314,7 +315,7 @@ class Charge extends Model
     public function setRefund(string $description)
     {
         if ($this->paid) {
-            $refund = $this->refunds()->create([
+            $refund = $this->refunds()->save([
                 'user_id' => $this->user_id,
                 'amount' => $this->amount,
                 'description' => $description,

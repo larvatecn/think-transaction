@@ -9,6 +9,7 @@ declare (strict_types=1);
 
 namespace Larva\Transaction\Models;
 
+use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Exception;
 use Larva\Transaction\Events\RefundFailure;
@@ -218,7 +219,7 @@ class Refund extends Model
         if ($this->succeed) {
             return true;
         }
-        $this->save(['status' => self::STATUS_SUCCEEDED, 'transaction_no' => $transactionNo, 'time_succeed' => $this->freshTimestamp(), 'extra' => $params]);
+        $this->save(['status' => self::STATUS_SUCCEEDED, 'transaction_no' => $transactionNo, 'time_succeed' => Carbon::now(), 'extra' => $params]);
         Event::trigger(new RefundSuccess($this));
         return $this->succeed;
     }

@@ -9,6 +9,7 @@ declare (strict_types=1);
 
 namespace Larva\Transaction\Models;
 
+use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Exception;
 use Larva\Transaction\Events\TransferFailure;
@@ -200,7 +201,7 @@ class Transfer extends Model
         if ($this->paid) {
             return true;
         }
-        $paid = $this->save(['transaction_no' => $transactionNo, 'transferred_at' => $this->freshTimestamp(), 'status' => static::STATUS_PAID, 'extra' => $params]);
+        $paid = $this->save(['transaction_no' => $transactionNo, 'transferred_at' => Carbon::now(), 'status' => static::STATUS_PAID, 'extra' => $params]);
         Event::trigger(new TransferShipped($this));
         return $paid;
     }

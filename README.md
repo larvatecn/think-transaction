@@ -38,10 +38,42 @@ composer require larva/think-transaction -vv
 
 
 ```php
+namespace app\model;
+
+use Exception;
+use Larva\Transaction\Models\Charge;
+use Larva\Transaction\Models\Refund;
+use think\Model;
+use think\model\concern\SoftDelete;
+use think\model\relation\MorphOne;
+
 /**
- * @property Charge $change
+ * 订单模型
+ * @property int $id
+ * @property int $user_id
+ * @property-read boolean $paid
+ * @property string $subject
+ * @property string $body
+ * @property string $amount
+ * @property string $channel
+ * @property string $type
+ * @property string $client_ip
+ * @property string $status
+ * @property datetime $pay_succeeded_at
+ *
+ * @property Charge $charge
+ *
+ * @author Tongle Xu <xutongle@gmail.com>
  */
-class Order extends Model {
+class Order extends Model
+{
+    use SoftDelete;
+
+    const STATUS_PENDING = 'pending';//处理中： pending
+    const STATUS_SUCCEEDED = 'succeeded';//完成： succeeded
+    const STATUS_FAILED = 'failed';//失败： failed
+
+    protected $name = 'orders';
 
     /**
      * 新增后会自动触发该事件，这时候就自动创建了付款参数；
@@ -49,23 +81,23 @@ class Order extends Model {
      */
     public static function onAfterInsert($model)
     {
-        $model->charge()->create([
+        $model->charge()->save([
             'user_id' => $model->user_id,
             'amount' => $model->amount,//金额单位分
-            'channel' => $model->channel,//付款通道 ，如weixin
+            'channel' => $model->channel,//付款通道 ，如 wechat
             'subject' => '订单付款',
             'body' => '订单详情',
             'client_ip' => $model->client_ip,
             'type' => $model->type,//交易类型 如 app
         ]);
     }
-    
+
     /**
      * Get the entity's charge.
      *
      * @return MorphOne
      */
-    public function charge()
+    public function charge(): MorphOne
     {
         return $this->morphOne(Charge::class, 'source');
     }
@@ -75,7 +107,7 @@ class Order extends Model {
      */
     public function setSucceeded()
     {
-        $this->update(['pay_channel' => $this->charge->channel, 'status' => static::STATUS_PAY_SUCCEEDED, 'pay_succeeded_at' => $this->freshTimestamp()]);
+        $this->update(['channel' => $this->charge->channel, 'status' => static::STATUS_SUCCEEDED, 'pay_succeeded_at' => $this->freshTimestamp()]);
     }
 
     /**
@@ -89,20 +121,21 @@ class Order extends Model {
     /**
      * 发起退款
      * @param string $description 退款描述
-     * @return Model|Refund
+     * @return Refund
      * @throws Exception
      */
-    public function setRefund(string $description)
+    public function setRefund(string $description): Refund
     {
         if ($this->paid && $this->charge->allowRefund) {
-            $refund = $this->charge->refunds()->create([
+            /** @var Refund $refund */
+            $refund = $this->charge->refunds()->save([
                 'user_id' => $this->user_id,
                 'amount' => $this->amount,
                 'description' => $description,
                 'charge_id' => $this->charge->id,
                 'charge_order_id' => $this->id,
             ]);
-            $this->update(['refunded' => true]);
+            $this->save(['refunded' => true]);
             return $refund;
         }
         throw new Exception ('Not paid, no refund.');
@@ -112,7 +145,13 @@ class Order extends Model {
 
 ```php
 $order = Order::create([
-//你创建订单的参数
+    'user_id' => 1,
+    'subject' => '标题',
+    'client_ip' => '192.168.1.1',
+    'amount' => 100,
+    'channel' => 'wechat',
+    'type' => 'app'
+    //你创建订单的参数
 ]);
 //获取付款凭证 数组
 $credential = $order->charge->getCredential();
