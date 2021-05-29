@@ -243,7 +243,7 @@ class Charge extends Model
             }
             $i++;
             $id = time() . str_pad((string)$i, 4, '0', STR_PAD_LEFT);
-            $row = static::where($this->key, '=', $id)->exists();
+            $row = static::where($this->key, '=', $id)->find();
         } while ($row);
         return $id;
     }
