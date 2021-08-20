@@ -24,9 +24,8 @@ use think\model\relation\MorphTo;
 
 /**
  * 退款处理模型
- * @property string $id
- * @property int $user_id
- * @property int $charge_id
+ * @property string $id 退款流水号
+ * @property int $charge_id 付款流水号
  * @property int $amount
  * @property string $status
  * @property string $description 退款描述

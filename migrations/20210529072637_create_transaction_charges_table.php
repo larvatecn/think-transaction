@@ -30,22 +30,25 @@ class CreateTransactionChargesTable extends Migrator
     {
         $table = $this->table('transaction_charges', ['id' => false, 'primary_key' => 'id']);
         $table->addColumn('id', 'string', ['limit' => 64])
-            ->addColumn('user_id', 'biginteger', ['signed' => true, 'null' => true])
-            ->addColumn('paid', 'boolean', ['default' => false, 'null' => true])
-            ->addColumn('refunded', 'boolean', ['default' => false, 'null' => true])
-            ->addColumn('reversed', 'boolean', ['default' => false, 'null' => true])
-            ->addColumn('channel', 'string', ['limit' => 64, 'null' => true])
-            ->addColumn('type', 'string', ['limit' => 20, 'null' => true])
-            ->addMorphs('source')//多态
-            ->addColumn('amount', 'integer', ['signed' => true])
+            ->addColumn('trade_channel', 'string', ['limit' => 64, 'null' => true])
+            ->addColumn('trade_type', 'string', ['limit' => 20, 'null' => true])
+            ->addColumn('total_amount', 'integer', ['signed' => true])
+            ->addColumn('trade_state', 'string', ['limit' => 32, 'null' => true])
             ->addColumn('currency', 'string', ['limit' => 3, 'default' => 'CNY'])
+
+            ->addColumn('transaction_no', 'string', ['limit' => 64, 'null' => true])
+
+            ->addMorphs('source')//多态
+
+
             ->addColumn('subject', 'string', ['limit' => 64,])
-            ->addColumn('body', 'string', ['limit' => 128, 'null' => true])
-            ->addColumn('description', 'string', ['limit' => 500, 'null' => true])
+            ->addColumn('description', 'string', ['limit' => 127, 'null' => true])
             ->addColumn('client_ip', 'string', ['limit' => 45, 'null' => true])
+
+
             ->addColumn('time_paid', 'datetime', ['null' => true])
             ->addColumn('time_expire', 'datetime', ['null' => true])
-            ->addColumn('transaction_no', 'string', ['limit' => 64, 'null' => true])
+
             ->addColumn('amount_refunded', 'integer', ['signed' => true, 'null' => true, 'default' => 0])
             ->addColumn('failure_code', 'string', ['null' => true])
             ->addColumn('failure_msg', 'string', ['null' => true])
@@ -58,7 +61,6 @@ class CreateTransactionChargesTable extends Migrator
             ->addIndex('id',[
                 'unique' => true,
             ])
-            ->addIndex('user_id')
             ->create();
     }
 }
