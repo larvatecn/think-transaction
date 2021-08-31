@@ -51,9 +51,9 @@ class Refund extends Model
     use SoftDelete;
 
     //退款状态
-    const STATUS_PENDING = 'pending';
-    const STATUS_SUCCEEDED = 'succeeded';
-    const STATUS_FAILED = 'failed';
+    const STATE_PENDING = 'pending';
+    const STATE_SUCCEEDED = 'succeeded';
+    const STATE_FAILED = 'failed';
 
     //退款资金来源
     const FUNDING_SOURCE_UNSETTLED = 'unsettled_funds';//使用未结算资金退款

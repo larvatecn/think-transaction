@@ -161,9 +161,9 @@ class Charge extends Model
      * 是否已经付款
      * @return bool
      */
-    public function getPaidAttr()
+    public function getPaidAttr(): bool
     {
-        return $this->trade_state == self::STATE_SUCCESS;
+        return $this->state == self::STATE_SUCCESS;
     }
 
     /**

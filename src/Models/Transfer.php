@@ -51,10 +51,10 @@ class Transfer extends Model
     use SoftDelete;
 
     //付款状态
-    const STATUS_SCHEDULED = 'scheduled';//scheduled: 待发送
-    const STATUS_PENDING = 'pending';//pending: 处理中
-    const STATUS_PAID = 'paid';//paid: 付款成功
-    const STATUS_FAILED = 'failed';//failed: 付款失败
+    const STATE_SCHEDULED = 'scheduled';//scheduled: 待发送
+    const STATE_PENDING = 'pending';//pending: 处理中
+    const STATE_PAID = 'paid';//paid: 付款成功
+    const STATE_FAILED = 'failed';//failed: 付款失败
 
     protected $name = 'transaction_transfer';
 

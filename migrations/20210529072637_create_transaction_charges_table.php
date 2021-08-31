@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use think\migration\Migrator;
 use think\migration\db\Column;
 
@@ -29,38 +31,26 @@ class CreateTransactionChargesTable extends Migrator
     public function change()
     {
         $table = $this->table('transaction_charges', ['id' => false, 'primary_key' => 'id']);
-        $table->addColumn('id', 'string', ['limit' => 64])
-            ->addColumn('trade_channel', 'string', ['limit' => 64, 'null' => true])
-            ->addColumn('trade_type', 'string', ['limit' => 20, 'null' => true])
-            ->addColumn('total_amount', 'integer', ['signed' => true])
-            ->addColumn('trade_state', 'string', ['limit' => 32, 'null' => true])
-            ->addColumn('currency', 'string', ['limit' => 3, 'default' => 'CNY'])
-
-            ->addColumn('transaction_no', 'string', ['limit' => 64, 'null' => true])
-
-            ->addMorphs('source')//多态
-
-
+        $table->addColumn('id', 'string', ['limit' => 64, 'comment' => '付款流水号'])
+            ->addColumn('channel', 'string', ['limit' => 64, 'null' => true, 'comment' => '付款渠道'])
+            ->addColumn('type', 'string', ['limit' => 20, 'null' => true, 'comment' => '交易类型'])
+            ->addColumn('transaction_no', 'string', ['limit' => 64, 'null' => true, 'comment' => '网关流水号'])
+            ->addColumn(Column::bigInteger('source_id')->setUnSigned())
+            ->addColumn(Column::string('source_type'))
             ->addColumn('subject', 'string', ['limit' => 64,])
             ->addColumn('description', 'string', ['limit' => 127, 'null' => true])
-            ->addColumn('client_ip', 'string', ['limit' => 45, 'null' => true])
-
-
-            ->addColumn('time_paid', 'datetime', ['null' => true])
-            ->addColumn('time_expire', 'datetime', ['null' => true])
-
-            ->addColumn('amount_refunded', 'integer', ['signed' => true, 'null' => true, 'default' => 0])
-            ->addColumn('failure_code', 'string', ['null' => true])
-            ->addColumn('failure_msg', 'string', ['null' => true])
-            ->addColumn(Column::json('extra')->setNullable())
-            ->addColumn(Column::json('metadata')->setNullable())
-            ->addColumn(Column::json('credential')->setNullable())
-            ->addColumn('created_at', 'datetime', ['null' => true, 'default' => 'CURRENT_TIMESTAMP'])
-            ->addColumn('updated_at', 'datetime', ['null' => true])
-            ->addColumn('deleted_at', 'datetime', ['null' => true])
-            ->addIndex('id',[
-                'unique' => true,
-            ])
+            ->addColumn('total_amount', 'integer', ['signed' => true, 'comment' => '订单总金额'])
+            ->addColumn('currency', 'string', ['limit' => 3, 'default' => 'CNY', 'comment' => '货币类型'])
+            ->addColumn('state', 'string', ['limit' => 32, 'null' => true, 'comment' => '交易状态'])
+            ->addColumn('client_ip', 'string', ['limit' => 45, 'null' => true, 'comment' => '客户端IP'])
+            ->addColumn(Column::json('payer')->setNullable()->setComment('支付者信息'))
+            ->addColumn(Column::json('credential')->setNullable()->setComment('客户端支付凭证'))
+            ->addColumn('expire_time', 'timestamp', ['null' => true])
+            ->addColumn('create_time', 'timestamp', ['null' => true, 'default' => 'CURRENT_TIMESTAMP'])
+            ->addColumn('update_time', 'timestamp', ['null' => true])
+            ->addColumn('delete_time', 'timestamp', ['null' => true])
+            ->addIndex('id', ['unique' => true,])
+            ->addIndex(['source_id', 'source_type'], ['name' => null])
             ->create();
     }
 }
