@@ -9,21 +9,21 @@ declare (strict_types = 1);
 
 namespace Larva\Transaction\Events;
 
-use Larva\Transaction\Models\Transfer;
+use Larva\Transaction\Models\Refund;
 
-class TransferShipped
+class RefundSucceeded
 {
     /**
-     * @var Transfer
+     * @var Refund
      */
-    public Transfer $transfer;
+    public Refund $refund;
 
     /**
-     * TransferShipped constructor.
-     * @param Transfer $transfer
+     * RefundFailure constructor.
+     * @param Refund $refund
      */
-    public function __construct(Transfer $transfer)
+    public function __construct(Refund $refund)
     {
-        $this->transfer = $transfer;
+        $this->refund = $refund;
     }
 }

@@ -11,7 +11,9 @@ namespace Larva\Transaction;
 
 use Larva\Transaction\Http\Controllers\NotifyController;
 use Larva\Transaction\Http\Controllers\PaymentController;
+use think\Container;
 use think\Route;
+use Yansongda\Pay\Pay;
 
 /**
  * Class TransactionService
@@ -26,7 +28,13 @@ class TransactionService extends \think\Service
      */
     public function register()
     {
+        $this->app->bind('transaction.alipay', function () {
+            return Pay::alipay(config('transaction.alipay'));
+        });
 
+        $this->app->bind('transaction.wechat', function () {
+            return Pay::wechat(config('transaction.wechat'));
+        });
     }
 
     public function boot(): void

@@ -9,21 +9,21 @@ declare (strict_types = 1);
 
 namespace Larva\Transaction\Events;
 
-use Larva\Transaction\Models\Transfer;
+use Larva\Transaction\Models\Charge;
 
-class TransferShipped
+class ChargeFailed
 {
     /**
-     * @var Transfer
+     * @var Charge
      */
-    public Transfer $transfer;
+    public Charge $charge;
 
     /**
-     * TransferShipped constructor.
-     * @param Transfer $transfer
+     * ChargeClosed constructor.
+     * @param Charge $charge
      */
-    public function __construct(Transfer $transfer)
+    public function __construct(Charge $charge)
     {
-        $this->transfer = $transfer;
+        $this->charge = $charge;
     }
 }

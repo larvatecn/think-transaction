@@ -30,7 +30,7 @@ class CreateTransactionTransferTable extends Migrator
     public function change()
     {
         $table = $this->table('transaction_transfer', ['id' => false, 'primary_key' => 'id']);
-        $table->addColumn('id', 'string', ['limit' => 64])
+        $table->addColumn(Column::bigInteger('id')->setUnSigned())
             ->addColumn('channel', 'string', ['limit' => 64, 'null' => true])
             ->addColumn('state', 'string', ['limit' => 15, 'null' => true, 'default' => Transfer::STATE_SCHEDULED])
             ->addColumn(Column::bigInteger('source_id')->setUnSigned())

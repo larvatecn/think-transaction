@@ -49,6 +49,8 @@ use think\model\relation\MorphTo;
 class Transfer extends Model
 {
     use SoftDelete;
+    use Traits\DateTimeFormatter;
+    use Traits\UsingTimestampAsPrimaryKey;
 
     //付款状态
     const STATE_SCHEDULED = 'scheduled';//scheduled: 待发送

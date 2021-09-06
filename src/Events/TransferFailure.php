@@ -16,7 +16,7 @@ class TransferFailure
     /**
      * @var Transfer
      */
-    public $transfer;
+    public Transfer $transfer;
 
     /**
      * TransferShipped constructor.

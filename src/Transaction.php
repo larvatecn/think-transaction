@@ -12,26 +12,58 @@ namespace Larva\Transaction;
 use Larva\Transaction\Models\Charge;
 use Larva\Transaction\Models\Refund;
 use Larva\Transaction\Models\Transfer;
-use Yansongda\Pay\Pay;
+use think\Facade;
+use Yansongda\Pay\Gateways\Alipay;
+use Yansongda\Pay\Gateways\Wechat;
 
-class Transaction
+class Transaction extends Facade
 {
     //支持的交易通道
     const CHANNEL_WECHAT = 'wechat';
     const CHANNEL_ALIPAY = 'alipay';
 
     /**
+     * 获取当前Facade对应类名
+     * @access protected
+     * @return string
+     */
+    protected static function getFacadeClass(): string
+    {
+        return 'transaction.alipay';
+    }
+
+    /**
+     * Return the facade accessor.
+     *
+     * @return Alipay
+     */
+    public static function alipay(): Alipay
+    {
+        return app('transaction.alipay');
+    }
+
+    /**
+     * Return the facade accessor.
+     *
+     * @return Wechat
+     */
+    public static function wechat(): Wechat
+    {
+        return app('transaction.wechat');
+    }
+
+    /**
      * 获取支持的交易网关
      * @param string $channel
-     * @return \Yansongda\Pay\Gateways\Alipay|\Yansongda\Pay\Gateways\Wechat
+     * @return Alipay|Wechat
      * @throws \Exception
      */
-    public static function getChannel(string $channel)
+    public static function getGateway(string $channel)
     {
         if ($channel == static::CHANNEL_WECHAT) {
-            return Pay::wechat(config('transaction.wechat'));
+            return static::wechat();
         } else if ($channel == static::CHANNEL_ALIPAY) {
-            return Pay::alipay(config('transaction.alipay'));
+            return static::alipay();
         } else {
             throw new \Exception ('The channel does not exist.');
         }

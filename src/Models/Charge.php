@@ -10,65 +10,77 @@ declare (strict_types=1);
 namespace Larva\Transaction\Models;
 
 use Carbon\Carbon;
-use Carbon\CarbonInterface;
-use Exception;
-use Larva\Transaction\Events\ChargeClosed;
-use Larva\Transaction\Events\ChargeFailure;
-use Larva\Transaction\Events\ChargeShipped;
+use Larva\Transaction\Events\ChargeFailed;
+use Larva\Transaction\Events\ChargeSucceeded;
 use Larva\Transaction\Transaction;
+use Larva\Transaction\TransactionException;
+use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\RedirectResponse;
+use Symfony\Component\HttpFoundation\Response;
 use think\facade\Event;
-use think\facade\Log;
 use think\Model;
 use think\model\concern\SoftDelete;
-use think\model\relation\BelongsTo;
 use think\model\relation\HasMany;
 use think\model\relation\MorphTo;
+use Yansongda\Pay\Exceptions\InvalidGatewayException;
+use Yansongda\Supports\Collection;
 
 /**
  * 支付模型
- * @property string $id
- * @property string $channel 交易渠道
- * @property string $type  交易类型
+ * @property int $id 收款流水号
+ * @property string $trade_channel 支付渠道
+ * @property string $trade_type 支付类型
  * @property string $transaction_no 支付网关交易号
- * @property string $source_id 订单ID
- * @property string $source_type 订单类型
+ * @property string $order_id 订单ID
+ * @property string $order_type 订单类型
  * @property string $subject 支付标题
  * @property string $description 描述
  * @property int $total_amount 支付金额，单位分
  * @property string $currency 支付币种
  * @property string $state 交易状态
- * @property string $state_desc 交易状态描述
  * @property string $client_ip 客户端IP
- * @property array $payer 支付者信息
+ * @property array $metadata 元信息
  * @property array $credential 客户端支付凭证
+ * @property array $failure 错误信息
+ * @property array $extra 网关返回的信息
  * @property string|null $expire_time 交易结束时间
  * @property string|null $success_time 支付完成时间
  * @property string $create_time 创建时间
  * @property string|null $update_time 更新时间
  * @property string|null $delete_time 软删除时间
  *
- * @property-read bool $paid 是否已付款
+ * @property Model $source 触发该收款的订单模型
+ * @property Refund $refunds 退款列表
  *
- * @property Model $source
- * @property Refund $refunds
+ * @property-read bool $paid 是否已付款
+ * @property-read bool $refunded 是否有退款
+ * @property-read bool $reversed 是否已撤销
+ * @property-read bool $closed 是否已关闭
+ * @property-read string $stateDesc 状态描述
+ * @property-read int $refundedAmount 已退款钱数
  *
  * @author Tongle Xu <xutongle@gmail.com>
  */
 class Charge extends Model
 {
     use SoftDelete;
+    use Traits\DateTimeFormatter;
+    use Traits\UsingTimestampAsPrimaryKey;
+
+    public const STATE_SUCCESS = 'SUCCESS';
+    public const STATE_REFUND = 'REFUND';
+    public const STATE_NOTPAY = 'NOTPAY';
+    public const STATE_CLOSED = 'CLOSED';
+    public const STATE_REVOKED = 'REVOKED';
+    public const STATE_USERPAYING = 'USERPAYING';
+    public const STATE_PAYERROR = 'PAYERROR';
+    public const STATE_ACCEPT = 'ACCEPT';
 
     /**
      * 模型名称
      * @var string
      */
     protected $name = 'transaction_charges';
-
-    /**
-     * 主键名称
-     * @var string
-     */
-    protected $pk = 'id';
 
     /**
      * 是否需要自动写入时间戳 如果设置为字符串 则表示时间字段的类型
@@ -99,7 +111,7 @@ class Charge extends Model
      * @var array
      */
     protected $json = [
-        'payer', 'credential'
+        'metadata', 'credential'
     ];
 
     /**
@@ -108,35 +120,65 @@ class Charge extends Model
      * @var array
      */
     protected $type = [
-        'id' => 'string',
+        'id' => 'int',
+        'trade_channel' => 'string',
+        'trade_type' => 'string',
+        'transaction_no' => 'string',
+        'subject' => 'string',
+        'description' => 'string',
         'total_amount' => 'int',
+        'currency' => 'string',
+        'state' => 'string',
+        'client_ip' => 'string',
+        'metadata' => 'array',
+        'extra' => 'array',
+        'credential' => 'array',
+        'failure' => 'array',
         'expire_time' => 'datetime',
         'success_time' => 'datetime',
     ];
 
-    public const STATE_SUCCESS = 'SUCCESS';
-    public const STATE_PENDING = 'PENDING';
+    /**
+     * 交易状态，枚举值
+     * @var array|string[]
+     */
+    protected static array $stateMaps = [
+        self::STATE_SUCCESS => '支付成功',
+        self::STATE_REFUND => '转入退款',
+        self::STATE_NOTPAY => '未支付',
+        self::STATE_CLOSED => '已关闭',
+        self::STATE_REVOKED => '已撤销',//已撤销（仅付款码支付会返回）
+        self::STATE_USERPAYING => '用户支付中',//用户支付中（仅付款码支付会返回）
+        self::STATE_PAYERROR => '支付失败',//支付失败（仅付款码支付会返回）
+        self::STATE_ACCEPT => '已接收，等待扣款',
+    ];
 
     /**
      * 新增前事件
      * @param Charge $model
      * @return void
      */
-    public static function onBeforeInsert($model)
+    public static function onBeforeInsert(Charge $model)
     {
-        /** @var Charge $model */
-        $model->id = $model->generateId();
+        $model->id = $model->generateKey();
         $model->currency = $model->currency ?: 'CNY';
-        $model->state = self::STATE_PENDING;
+        $model->state = self::STATE_NOTPAY;
+    }
+
+    public static function onAfterInsert(Charge $model): void
+    {
+        if (!empty($model->trade_channel) && !empty($model->trade_type)) {//不为空就预下单
+            $model->prePay();
+        }
     }
 
     /**
-     * 新增后事件
-     * @param Charge $model
+     * 获取 State Label
+     * @return string[]
      */
-    public static function onAfterInsert($model)
+    public static function getStateMaps(): array
     {
-
+        return static::$stateMaps;
     }
 
     /**
@@ -163,24 +205,185 @@ class Charge extends Model
      */
     public function getPaidAttr(): bool
     {
-        return $this->state == self::STATE_SUCCESS;
+        return $this->state == self::STATE_SUCCESS || $this->state == self::STATE_REFUND;
     }
 
     /**
-     * 生成流水号
+     * 是否有退款
+     * @return bool
+     */
+    public function getRefundedAttr(): bool
+    {
+        return $this->state == static::STATE_REFUND;
+    }
+
+    /**
+     * 是否已撤销
+     * @return bool
+     */
+    public function getReversedAttr(): bool
+    {
+        return $this->state == static::STATE_REVOKED;
+    }
+
+    /**
+     * 是否已关闭
+     * @return bool
+     */
+    public function getClosedAttr(): bool
+    {
+        return $this->state == static::STATE_CLOSED;
+    }
+
+    /**
+     * 状态描述
      * @return string
      */
-    protected function generateId(): string
+    public function getStateDescAttr(): string
     {
-        $i = rand(0, 9999);
-        do {
-            if (9999 == $i) {
-                $i = 0;
+        return static::$stateMaps[$this->state] ?? '未知状态';
+    }
+
+    /**
+     * 已退款钱数
+     * @return int
+     */
+    public function getRefundedAmountAttribute(): int
+    {
+        if ($this->refunded) {
+            return (int)$this->refunds()->whereIn('status', [Refund::STATUS_PENDING, Refund::STATUS_SUCCESS, Refund::STATUS_PROCESSING])->sum('amount');
+        }
+        return 0;
+    }
+
+    /**
+     * 发起退款
+     * @param string $reason 退款原因
+     * @return Refund
+     * @throws TransactionException
+     */
+    public function refund(string $reason): Refund
+    {
+        if ($this->paid) {
+            /** @var Refund $refund */
+            $refund = $this->refunds()->create([
+                'charge_id' => $this->id,
+                'amount' => $this->total_amount,
+                'reason' => $reason,
+            ]);
+            $this->update(['state' => static::STATE_REFUND]);
+            return $refund;
+        }
+        throw new TransactionException('Not paid, no refund.');
+    }
+
+    /**
+     * 设置已付款状态
+     * @param string $transactionNo 支付渠道返回的交易流水号。
+     * @param array $extra
+     * @return bool
+     */
+    public function markSucceeded(string $transactionNo, array $extra = []): bool
+    {
+        if ($this->paid) {
+            return true;
+        }
+        $state = $this->save([
+            'transaction_no' => $transactionNo,
+            'expired_at' => null,
+            'succeed_at' => $this->freshTimestamp(),
+            'state' => static::STATE_SUCCESS,
+            'credential' => null,
+            'extra' => $extra
+        ]);
+        Event::trigger(new ChargeSucceeded($this));
+        return $state;
+    }
+
+    /**
+     * 设置支付错误
+     * @param string $code
+     * @param string $desc
+     * @return bool
+     */
+    public function markFailed(string $code, string $desc): bool
+    {
+        $state = $this->save([
+            'state' => static::STATE_PAYERROR,
+            'credential' => null,
+            'failure' => ['code' => $code, 'desc' => $desc]
+        ]);
+        Event::trigger(new ChargeFailed($this));
+        return $state;
+    }
+
+    /**
+     * 获取指定渠道的支付凭证
+     * @param string $channel
+     * @param string $type
+     * @return array
+     * @throws InvalidGatewayException
+     */
+    public function getCredential(string $channel, string $type): array
+    {
+        $this->update(['trade_channel' => $channel, 'trade_type' => $type]);
+        $this->prePay();
+        $this->refresh();
+        return $this->credential;
+    }
+
+    /**
+     * 订单付款预下单
+     * @throws InvalidGatewayException
+     */
+    public function prePay()
+    {
+        $channel = Transaction::getGateway($this->trade_channel);
+        $order = [
+            'out_trade_no' => $this->id,
+        ];
+        if ($this->trade_channel == Transaction::CHANNEL_WECHAT) {
+            $order['spbill_create_ip'] = $this->client_ip;
+            $order['total_fee'] = $this->total_amount;//总金额，单位分
+            $order['body'] = $this->description;
+            if ($this->expire_time) {
+                $order['time_expire'] = Carbon::createFromTimestamp($this->expire_time)->format('YmdHis');
             }
-            $i++;
-            $id = time() . str_pad((string)$i, 4, '0', STR_PAD_LEFT);
-            $row = static::where($this->key, '=', $id)->find();
-        } while ($row);
-        return $id;
+            if ($this->metadata['openid']) {
+                $order['openid'] = $this->metadata['openid'] ?? '';
+            }
+            $order['notify_url'] = url('transaction.notify.charge', ['channel' => Transaction::CHANNEL_WECHAT]);
+        } elseif ($this->trade_channel == Transaction::CHANNEL_ALIPAY) {
+            $order['total_amount'] = $this->total_amount / 100;//总钱数，单位元
+            $order['subject'] = $this->subject;
+            if ($this->description) {
+                $order['body'] = $this->description;
+            }
+            if ($this->expire_time) {
+                $order['time_expire'] = $this->expire_time;
+            }
+            $order['notify_url'] = url('transaction.notify.charge', ['channel' => Transaction::CHANNEL_ALIPAY]);
+            if ($this->trade_type == 'wap') {
+                $order['return_url'] = url('transaction.callback.charge', ['channel' => Transaction::CHANNEL_ALIPAY]);
+            }
+        }
+        // 获取支付凭证
+        $credential = $channel->pay($this->trade_type, $order);
+        if ($credential instanceof Collection) {
+            $credential = $credential->toArray();
+        } elseif ($credential instanceof RedirectResponse) {
+            $credential = ['url' => $credential->getTargetUrl()];
+        } elseif ($credential instanceof JsonResponse) {
+            $credential = json_decode($credential->getContent(), true);
+        } elseif ($credential instanceof Response) {//此处判断一定要在最后
+            if ($this->trade_channel == Transaction::CHANNEL_ALIPAY && $this->trade_type == 'app') {
+                $params = [];
+                parse_str($credential->getContent(), $params);
+                $credential = $params;
+            } else {//WEB H5
+                $credential = ['html' => $credential->getContent()];
+            }
+        }
+        $this->save(['credential' => $credential]);
     }
 }

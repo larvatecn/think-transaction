@@ -12,8 +12,8 @@ namespace Larva\Transaction\Models;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Exception;
-use Larva\Transaction\Events\RefundFailure;
-use Larva\Transaction\Events\RefundSuccess;
+use Larva\Transaction\Events\RefundFailed;
+use Larva\Transaction\Events\RefundSucceeded;
 use Larva\Transaction\Transaction;
 use think\facade\Event;
 use think\facade\Log;
@@ -49,23 +49,22 @@ use think\model\relation\MorphTo;
 class Refund extends Model
 {
     use SoftDelete;
+    use Traits\DateTimeFormatter;
+    use Traits\UsingTimestampAsPrimaryKey;
 
-    //退款状态
-    const STATE_PENDING = 'pending';
-    const STATE_SUCCEEDED = 'succeeded';
-    const STATE_FAILED = 'failed';
-
-    //退款资金来源
-    const FUNDING_SOURCE_UNSETTLED = 'unsettled_funds';//使用未结算资金退款
-    const FUNDING_SOURCE_RECHARGE = 'recharge_funds';//使用可用余额退款
-
-    protected $name = 'transaction_refunds';
+    // 退款状态机
+    public const STATUS_PENDING = 'PENDING';//待处理
+    public const STATUS_SUCCESS = 'SUCCESS';//退款成功
+    public const STATUS_CLOSED = 'CLOSED';//退款关闭
+    public const STATUS_PROCESSING = 'PROCESSING';//退款处理中
+    public const STATUS_ABNORMAL = 'ABNORMAL';//退款异常
 
     /**
-     * 主键值
+     * 模型名称
+     *
      * @var string
      */
-    protected $key = 'id';
+    protected $name = 'transaction_refunds';
 
     /**
      * 这个属性应该被转换为原生类型.
@@ -73,11 +72,14 @@ class Refund extends Model
      * @var array
      */
     protected $type = [
-        'id' => 'string',
+        'id' => 'int',
+        'charge_id' => 'int',
+        'transaction_no' => 'string',
         'amount' => 'int',
-        'succeed' => 'boolean',
-        'metadata' => 'array',
-        'extra' => 'array'
+        'reason' => 'string',
+        'status' => 'string',
+        'extra' => 'array',
+        'failure' => 'array'
     ];
 
     /**
@@ -109,43 +111,10 @@ class Refund extends Model
      * @param Refund $model
      * @return void
      */
-    public static function onBeforeInsert($model)
+    public static function onBeforeInsert(Refund $model)
     {
-        /** @var Refund $model */
-        $model->id = $model->generateId();
+        $model->id = $model->generateKey();
         $model->status = static::STATUS_PENDING;
-        $model->funding_source = $model->getFundingSource();
-    }
-
-    /**
-     * 新增后事件
-     * @param Refund $model
-     */
-    public static function onAfterInsert($model)
-    {
-        try {
-            $model->send();
-        } catch (Exception $e) {
-            Log::error($e->getMessage());
-        }
-    }
-
-    /**
-     * 关联调用该功能模型
-     * @return MorphTo
-     */
-    public function source(): MorphTo
-    {
-        return $this->morphTo();
-    }
-
-    /**
-     * 关联用户模型
-     * @return BelongsTo
-     */
-    public function user(): BelongsTo
-    {
-        return $this->belongsTo(config('transaction.user'), 'user_id');
     }
 
     /**
@@ -158,68 +127,40 @@ class Refund extends Model
     }
 
     /**
-     * 生成流水号
-     * @return string
-     */
-    public function generateId(): string
-    {
-        $i = rand(0, 9999);
-        do {
-            if (9999 == $i) {
-                $i = 0;
-            }
-            $i++;
-            $id = time() . str_pad((string)$i, 4, '0', STR_PAD_LEFT);
-            $row = static::where($this->key, '=', $id)->find();
-        } while ($row);
-        return $id;
-    }
-
-    /**
-     * 获取微信退款资金来源
-     * @return string
-     */
-    public function getFundingSource(): string
-    {
-        return config('transaction.wechat.unsettled_funds', 'REFUND_SOURCE_RECHARGE_FUNDS');
-    }
-
-    /**
      * 退款是否成功
      * @return bool
      */
     public function getSucceedAttr(): bool
     {
-        return $this->status == self::STATUS_SUCCEEDED;
+        return $this->status == self::STATUS_SUCCESS;
     }
 
     /**
      * 设置退款错误
      * @param string $code
-     * @param string $msg
+     * @param string $desc
      * @return bool
      */
-    public function setFailure(string $code, string $msg): bool
+    public function markFailed(string $code, string $desc): bool
     {
-        $succeed = $this->save(['status' => self::STATUS_FAILED, 'failure_code' => $code, 'failure_msg' => $msg]);
-        $this->charge->save(['amount_refunded' => $this->charge->amount_refunded - $this->amount]);//可退款金额，减回去
-        Event::trigger(new RefundFailure($this));
+        $succeed = $this->save(['status' => self::STATUS_ABNORMAL, 'failure' => ['code' => $code, 'desc' => $desc]]);
+        Event::trigger(new RefundFailed($this));
         return $succeed;
     }
 
     /**
-     * 设置退款成功
+     * 设置退款完成
      * @param string $transactionNo
-     * @param array $params
+     * @param array $extra
      * @return bool
      */
-    public function setRefunded(string $transactionNo, array $params = []): bool
+    public function markSucceeded(string $transactionNo, array $extra = []): bool
     {
         if ($this->succeed) {
             return true;
         }
-        $this->save(['status' => self::STATUS_SUCCEEDED, 'transaction_no' => $transactionNo, 'time_succeed' => Carbon::now(), 'extra' => $params]);
-        Event::trigger(new RefundSuccess($this));
+        $this->save(['status' => self::STATUS_SUCCESS, 'transaction_no' => $transactionNo, 'succeed_at' => $this->freshTimestamp(), 'extra' => $extra]);
+        Event::trigger(new RefundSucceeded($this));
         return $this->succeed;
     }
 
@@ -228,32 +169,27 @@ class Refund extends Model
      * @return Refund
      * @throws Exception
      */
-    public function send(): Refund
+    public function gatewayHandle(): Refund
     {
-        $this->charge->save(['refunded' => true, 'amount_refunded' => $this->charge->amount_refunded + $this->amount]);
-        $channel = Transaction::getChannel($this->charge->channel);
-        if ($this->charge->channel == Transaction::CHANNEL_WECHAT) {
-            $refundAccount = 'REFUND_SOURCE_RECHARGE_FUNDS';
-            if ($this->funding_source == Refund::FUNDING_SOURCE_UNSETTLED) {
-                $refundAccount = 'REFUND_SOURCE_UNSETTLED_FUNDS';
-            }
+        $channel = Transaction::getGateway($this->charge->trade_channel);
+        if ($this->charge->trade_channel == Transaction::CHANNEL_WECHAT) {
             $order = [
                 'out_refund_no' => $this->id,
                 'out_trade_no' => $this->charge->id,
-                'total_fee' => $this->charge->amount,
+                'total_fee' => $this->charge->total_amount,
                 'refund_fee' => $this->amount,
                 'refund_fee_type' => $this->charge->currency,
-                'refund_desc' => $this->description,
-                'refund_account' => $refundAccount,
+                'refund_desc' => $this->reason,
+                'refund_account' => 'REFUND_SOURCE_RECHARGE_FUNDS',
                 'notify_url' => url('transaction.notify.refund', ['channel' => Transaction::CHANNEL_WECHAT]),
             ];
             try {
                 $response = $channel->refund($order);
-                $this->setRefunded($response->transaction_id, $response->toArray());
+                $this->markSucceeded($response->transaction_id, $response->toArray());
             } catch (Exception $exception) {//设置失败
-                $this->setFailure('FAIL', $exception->getMessage());
+                $this->markFailed('FAIL', $exception->getMessage());
             }
-        } else if ($this->charge->channel == Transaction::CHANNEL_ALIPAY) {
+        } elseif ($this->charge->trade_channel == Transaction::CHANNEL_ALIPAY) {
             $order = [
                 'out_trade_no' => $this->charge->id,
                 'trade_no' => $this->charge->transaction_no,
@@ -264,9 +200,9 @@ class Refund extends Model
             ];
             try {
                 $response = $channel->refund($order);
-                $this->setRefunded($response->trade_no, $response->toArray());
+                $this->markSucceeded($response->trade_no, $response->toArray());
             } catch (Exception $exception) {//设置失败
-                $this->setFailure('FAIL', $exception->getMessage());
+                $this->markFailed('FAIL', $exception->getMessage());
             }
         }
         return $this;

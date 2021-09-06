@@ -31,9 +31,9 @@ class CreateTransactionChargesTable extends Migrator
     public function change()
     {
         $table = $this->table('transaction_charges', ['id' => false, 'primary_key' => 'id']);
-        $table->addColumn('id', 'string', ['limit' => 64, 'comment' => '付款流水号'])
-            ->addColumn('channel', 'string', ['limit' => 64, 'null' => true, 'comment' => '付款渠道'])
-            ->addColumn('type', 'string', ['limit' => 20, 'null' => true, 'comment' => '交易类型'])
+        $table->addColumn(Column::bigInteger('id')->setUnSigned())
+            ->addColumn('trade_channel', 'string', ['limit' => 64, 'null' => true, 'comment' => '付款渠道'])
+            ->addColumn('trade_type', 'string', ['limit' => 20, 'null' => true, 'comment' => '交易类型'])
             ->addColumn('transaction_no', 'string', ['limit' => 64, 'null' => true, 'comment' => '网关流水号'])
             ->addColumn(Column::bigInteger('source_id')->setUnSigned())
             ->addColumn(Column::string('source_type'))
@@ -43,7 +43,7 @@ class CreateTransactionChargesTable extends Migrator
             ->addColumn('currency', 'string', ['limit' => 3, 'default' => 'CNY', 'comment' => '货币类型'])
             ->addColumn('state', 'string', ['limit' => 32, 'null' => true, 'comment' => '交易状态'])
             ->addColumn('client_ip', 'string', ['limit' => 45, 'null' => true, 'comment' => '客户端IP'])
-            ->addColumn(Column::json('payer')->setNullable()->setComment('支付者信息'))
+            ->addColumn(Column::json('metadata')->setNullable()->setComment('元信息'))
             ->addColumn(Column::json('credential')->setNullable()->setComment('客户端支付凭证'))
             ->addColumn('expire_time', 'timestamp', ['null' => true])
             ->addColumn('create_time', 'timestamp', ['null' => true, 'default' => 'CURRENT_TIMESTAMP'])

@@ -191,8 +191,8 @@ class TransactionCharge
     public function subscribe(Event $event)
     {
         $event->listen(\Larva\Transaction\Events\ChargeClosed::class, [$this, 'onChargeClosed']);
-        $event->listen(\Larva\Transaction\Events\ChargeFailure::class, [$this, 'onChargeFailure']);
-        $event->listen(\Larva\Transaction\Events\ChargeShipped::class, [$this, 'onChargeShipped']);
+        $event->listen(\Larva\Transaction\Events\ChargeFailed::class, [$this, 'onChargeFailure']);
+        $event->listen(\Larva\Transaction\Events\ChargeSucceeded::class, [$this, 'onChargeShipped']);
     }
 }
 ```
