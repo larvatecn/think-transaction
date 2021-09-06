@@ -9,33 +9,26 @@ declare (strict_types=1);
 
 namespace Larva\Transaction\Models;
 
-use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Exception;
 use Larva\Transaction\Events\RefundFailed;
 use Larva\Transaction\Events\RefundSucceeded;
 use Larva\Transaction\Transaction;
 use think\facade\Event;
-use think\facade\Log;
 use think\Model;
 use think\model\concern\SoftDelete;
 use think\model\relation\BelongsTo;
-use think\model\relation\MorphTo;
 
 /**
  * 退款处理模型
  * @property string $id 退款流水号
- * @property int $charge_id 付款流水号
- * @property int $amount
- * @property string $status
- * @property string $description 退款描述
- * @property string $failure_code
- * @property string $failure_msg
- * @property string $charge_order_id
- * @property string $transaction_no
- * @property string $funding_source 退款资金来源
- * @property array $metadata 元数据
- * @property array $extra 渠道数据
+ * @property int $charge_id 付款ID
+ * @property string $transaction_no 网关流水号
+ * @property int $amount 退款金额/单位分
+ * @property string $reason 退款描述
+ * @property string $status 退款状态
+ * @property array $failure 退款失败对象
+ * @property array $extra 渠道返回的额外信息
  * @property CarbonInterface $deleted_at 软删除时间
  * @property CarbonInterface $created_at 创建时间
  * @property CarbonInterface $updated_at 更新时间
@@ -115,6 +108,16 @@ class Refund extends Model
     {
         $model->id = $model->generateKey();
         $model->status = static::STATUS_PENDING;
+    }
+
+    /**
+     * 写入后
+     * @param Refund $model
+     * @throws Exception
+     */
+    public static function onAfterInsert(Refund $model): void
+    {
+        $model->gatewayHandle();
     }
 
     /**
