@@ -1,70 +1,67 @@
 <?php
+declare(strict_types=1);
+
+use Yansongda\Pay\Pay;
 
 return [
     'alipay' => [
-        // 支付宝分配的 APPID
-        'app_id' => env('ALI_APP_ID', ''),
-
-        // 支付宝异步通知地址
-        'notify_url' => '',
-
-        // 支付成功后同步通知地址
-        'return_url' => '',
-
-        // 阿里公共密钥，验证签名时使用
-        'ali_public_key' => env('ALI_PUBLIC_KEY', ''),
-
-        // 自己的私钥，签名时使用
-        'private_key' => env('ALI_PRIVATE_KEY', ''),
-
-        // optional，默认 warning；日志路径为：sys_get_temp_dir().'/logs/yansongda.pay.log'
-        'log' => [
-            'file' => runtime_path('log/alipay.log'),
-            'level' => 'debug',
-            'type' => 'daily', // optional, 可选 daily.
-            'max_file' => 30,
+        'default' => [
+            // 支付宝分配的 app_id
+            'app_id' => '',
+            // 应用私钥
+            'app_secret_cert' => config_path('alicert/xxx.pem'),
+            // 应用公钥证书 路径
+            'app_public_cert_path' => config_path('alicert/appCertPublicKey_xxx.crt'),
+            // 支付宝公钥证书 路径
+            'alipay_public_cert_path' => config_path('alicert/alipayCertPublicKey_RSA2.crt'),
+            // 支付宝根证书 路径
+            'alipay_root_cert_path' => config_path('alicret/alipayRootCert.crt'),
+            'return_url' => '',//不用配置
+            'notify_url' => '',//不用配置
+            'mode' => Pay::MODE_NORMAL,
         ],
-
-        // optional，设置此参数，将进入沙箱模式
-        // 'mode' => 'dev',
     ],
-
     'wechat' => [
-        // 公众号 APPID
-        'app_id' => env('WECHAT_APP_ID', ''),
+        'default' => [
+            // 公众号 的 app_id
+            'mp_app_id' => '',
 
-        // 小程序 APPID
-        'miniapp_id' => env('WECHAT_MINIAPP_ID', ''),
+            // 小程序 的 app_id
+            'mini_app_id' => '',
 
-        // APP 引用的 appid
-        'appid' => env('WECHAT_APPID', ''),
+            // app 的 app_id
+            'app_id' => '',
 
-        // 微信支付分配的微信商户号
-        'mch_id' => env('WECHAT_MCH_ID', ''),
+            // 商户号
+            'mch_id' => '',
 
-        // 微信支付异步通知地址
-        'notify_url' => '',
+            // 商户秘钥 V3
+            'mch_secret_key' => '',
 
-        // 微信支付签名秘钥
-        'key' => env('WECHAT_KEY', ''),
+            // 商户公钥证书路径
+            'mch_public_cert_path' => config_path('wxcert/apiclient_cert.pem'),
+            // 商户私钥证书路径
+            'mch_secret_cert' => config_path('wxcert/apiclient_key.pem'),
 
-        // 客户端证书路径，退款、红包等需要用到。请填写绝对路径，linux 请确保权限问题。pem 格式。
-        'cert_client' => config_path('wxcert/xxx.pem'),
-
-        // 客户端秘钥路径，退款、红包等需要用到。请填写绝对路径，linux 请确保权限问题。pem 格式。
-        'cert_key' => config_path('wxcert/xxx.pem'),
-
-        // optional，默认 warning；日志路径为：sys_get_temp_dir().'/logs/yansongda.pay.log'
-        'log' => [
-            'file' => runtime_path('log/wechat.log'),
-            'level' => 'debug',
-            'type' => 'daily', // optional, 可选 daily.
-            'max_file' => 30,
+            // 微信公钥证书路径
+            'wechat_public_cert_path' => [
+                '' => '',
+            ],
+            'notify_url' => '',//不用配置
+            'mode' => Pay::MODE_NORMAL,
         ],
-
-        // optional
-        // 'dev' 时为沙箱模式
-        // 'hk' 时为东南亚节点
-        // 'mode' => 'dev',
+    ],
+    'http' => [ // optional
+        'timeout' => 5.0,
+        'connect_timeout' => 5.0,
+        // 更多配置项请参考 [Guzzle](https://guzzle-cn.readthedocs.io/zh_CN/latest/request-options.html)
+    ],
+    // optional，默认 warning；日志路径为：sys_get_temp_dir().'/logs/yansongda.pay.log'
+    'logger' => [
+        'enable' => true,
+        'file' => runtime_path('log/pay.log'),
+        'level' => env('LOG_LEVEL'),
+        'type' => 'daily', // optional, 可选 daily.
+        'max_file' => 30,
     ],
 ];
