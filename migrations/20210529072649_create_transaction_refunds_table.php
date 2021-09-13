@@ -30,23 +30,21 @@ class CreateTransactionRefundsTable extends Migrator
     public function change()
     {
         $table = $this->table('transaction_refunds', ['id' => false, 'primary_key' => 'id']);
-        $table->addColumn(Column::bigInteger('id')->setUnSigned())
-            ->addColumn('charge_id', 'string', ['limit' => 64, 'null' => true])
-            ->addColumn('transaction_no', 'string', ['limit' => 64, 'null' => true])
-            ->addColumn('amount', 'integer', ['signed' => true])
-            ->addColumn('reason', 'string', ['limit' => 500, 'null' => true])
-            ->addColumn('status', 'string', ['null' => true, 'default' => Refund::STATUS_PENDING])
-            ->addColumn('failure_code', 'string', ['null' => true])
-            ->addColumn('failure_msg', 'string', ['null' => true])
-            ->addColumn(Column::json('extra')->setNullable())
-            ->addColumn('succeed_at', 'datetime', ['null' => true])
+        $table->addColumn(Column::bigInteger('id')->setUnSigned()->setComment('退款流水号'))
+            ->addColumn('charge_id', 'integer', ['signed' => true, 'null' => true, 'comment' => '付款流水号'])
+            ->addColumn('transaction_no', 'string', ['limit' => 64, 'null' => true, 'comment' => '网关流水号'])
+            ->addColumn('amount', 'integer', ['signed' => true, 'comment' => '退款金额'])
+            ->addColumn('reason', 'string', ['limit' => 127, 'null' => true, 'comment' => '退款原因'])
+            ->addColumn('status', 'string', ['null' => true, 'default' => Refund::STATUS_PENDING, 'comment' => '退款状态'])
+            ->addColumn(Column::json('failure')->setNullable()->setComment('错误信息'))
+            ->addColumn(Column::json('extra')->setNullable()->setComment('退款成功时额外返回的渠道信息'))
+            ->addColumn('succeed_at', 'datetime', ['null' => true, 'comment' => '成功时间'])
             ->addColumn('created_at', 'datetime', ['null' => true, 'default' => 'CURRENT_TIMESTAMP'])
             ->addColumn('updated_at', 'datetime', ['null' => true])
             ->addColumn('deleted_at', 'datetime', ['null' => true])
             ->addIndex('id', [
                 'unique' => true,
             ])
-            ->addIndex('user_id')
             ->addIndex('charge_id')
             ->create();
 

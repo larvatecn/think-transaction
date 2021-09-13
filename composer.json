@@ -9,7 +9,7 @@
     "ext-bcmath": "*",
     "ext-json": "*",
     "topthink/framework": "^6.0.0",
-    "yansongda/pay": "^2.10",
+    "yansongda/pay": "^3.0",
     "larva/support": "^1.2"
   },
   "autoload": {
@@ -19,7 +19,8 @@
   },
   "extra": {
     "branch-alias": {
-      "dev-master": "1.0-dev"
+      "2.x": "2.x-dev",
+      "dev-master": "3.x-dev"
     },
     "think": {
       "services": [
