@@ -38,9 +38,7 @@ class NotifyController
     }
 
     /**
-     * @return Response
-     * @throws \Yansongda\Pay\Exceptions\InvalidConfigException
-     * @throws \Yansongda\Pay\Exceptions\InvalidSignException
+     *
      */
     public function alipay()
     {

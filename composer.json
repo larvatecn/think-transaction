@@ -20,7 +20,7 @@
   "extra": {
     "branch-alias": {
       "2.x": "2.x-dev",
-      "dev-master": "3.x-dev"
+      "master": "3.x-dev"
     },
     "think": {
       "services": [

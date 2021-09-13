@@ -13,8 +13,8 @@ use Larva\Transaction\Models\Charge;
 use Larva\Transaction\Models\Refund;
 use Larva\Transaction\Models\Transfer;
 use think\Facade;
-use Yansongda\Pay\Gateways\Alipay;
-use Yansongda\Pay\Gateways\Wechat;
+use Yansongda\Pay\Provider\Alipay;
+use Yansongda\Pay\Provider\Wechat;
 
 class Transaction extends Facade
 {
