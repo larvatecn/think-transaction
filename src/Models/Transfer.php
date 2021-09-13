@@ -41,7 +41,7 @@ class Transfer extends Model
 {
     use SoftDelete;
     use Traits\DateTimeFormatter;
-    use Traits\UsingTimestampAsPrimaryKey;
+    use Traits\UsingDatetimeAsPrimaryKey;
 
     //付款状态
     public const STATUS_PENDING = 'PENDING';//待处理

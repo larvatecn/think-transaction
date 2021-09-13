@@ -43,7 +43,7 @@ class Refund extends Model
 {
     use SoftDelete;
     use Traits\DateTimeFormatter;
-    use Traits\UsingTimestampAsPrimaryKey;
+    use Traits\UsingDatetimeAsPrimaryKey;
 
     // 退款状态机
     public const STATUS_PENDING = 'PENDING';//待处理

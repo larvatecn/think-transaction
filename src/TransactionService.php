@@ -11,7 +11,6 @@ namespace Larva\Transaction;
 
 use Larva\Transaction\Http\Controllers\NotifyController;
 use Larva\Transaction\Http\Controllers\PaymentController;
-use think\Container;
 use think\Route;
 use Yansongda\Pay\Pay;
 
