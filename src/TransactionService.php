@@ -41,7 +41,7 @@ class TransactionService extends \think\Service
         $this->registerRoutes(function (Route $route) {
             $route->group('transaction', function (Route $route) {
                 //支付回调
-                $route->rule('notify/charge/:channel',PaymentController::class . "@paymentCallback", 'GET|POST')->name('transaction.callback.charge');
+                $route->rule('notify/charge/:channel',PaymentController::class . "@paymentCallback", 'GET|POST')->name('transaction.notify.charge');
                 //支付回调(一般用于扫码付)
                 $route->get('callback/charge/:id', PaymentController::class . "@paymentSuccess")->name('transaction.success.charge');
                 //支付状态查询

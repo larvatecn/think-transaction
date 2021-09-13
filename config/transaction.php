@@ -19,7 +19,7 @@ return [
 
         // optional，默认 warning；日志路径为：sys_get_temp_dir().'/logs/yansongda.pay.log'
         'log' => [
-            'file' => storage_path('logs/alipay.log'),
+            'file' => runtime_path('log/alipay.log'),
             //  'level' => 'debug'
             //  'type' => 'single', // optional, 可选 daily.
             //  'max_file' => 30,
@@ -56,7 +56,7 @@ return [
 
         // optional，默认 warning；日志路径为：sys_get_temp_dir().'/logs/yansongda.pay.log'
         'log' => [
-            'file' => storage_path('logs/wechat.log'),
+            'file' => runtime_path('log/wechat.log'),
             //  'level' => 'debug'
             //  'type' => 'single', // optional, 可选 daily.
             //  'max_file' => 30,

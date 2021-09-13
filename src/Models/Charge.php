@@ -58,7 +58,7 @@ use Yansongda\Supports\Collection;
  * @property-read bool $reversed 是否已撤销
  * @property-read bool $closed 是否已关闭
  * @property-read string $stateDesc 状态描述
- * @property-read int $refundedAmount 已退款钱数
+ * @property-read int $refundableAmount 已退款钱数
  *
  * @author Tongle Xu <xutongle@gmail.com>
  */
@@ -335,14 +335,16 @@ class Charge extends Model
      * 设置支付错误
      * @param string $code
      * @param string $desc
+     * @param array $extra
      * @return bool
      */
-    public function markFailed(string $code, string $desc): bool
+    public function markFailed(string $code, string $desc, array $extra = []): bool
     {
         $state = $this->save([
             'state' => static::STATE_PAYERROR,
             'credential' => [],
-            'failure' => ['code' => $code, 'desc' => $desc]
+            'failure' => ['code' => $code, 'desc' => $desc],
+            'extra' => $extra
         ]);
         Event::trigger(new ChargeFailed($this));
         return $state;
@@ -354,7 +356,6 @@ class Charge extends Model
      * @param string $type
      * @param array $metadata
      * @return array
-     * @throws InvalidGatewayException
      */
     public function getCredential(string $channel, string $type, array $metadata = []): array
     {

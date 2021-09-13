@@ -29,10 +29,10 @@ use think\model\relation\BelongsTo;
  * @property string $status 退款状态
  * @property array $failure 退款失败对象
  * @property array $extra 渠道返回的额外信息
- * @property CarbonInterface $deleted_at 软删除时间
- * @property CarbonInterface $created_at 创建时间
- * @property CarbonInterface $updated_at 更新时间
- * @property CarbonInterface $time_succeed 成功时间
+ * @property string $created_at 创建时间
+ * @property string $updated_at 更新时间
+ * @property string|null $succeed_at 成功时间
+ * @property string|null $deleted_at 删除时间
  *
  * @property Charge $charge
  * @property-read boolean $succeed
