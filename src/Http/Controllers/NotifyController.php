@@ -52,7 +52,7 @@ class NotifyController
         }
         return $pay->success();
     }
-
+    
     /**
      * 退款通知回调
      * @param Request $request
