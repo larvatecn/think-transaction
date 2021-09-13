@@ -9,7 +9,6 @@ declare (strict_types=1);
 
 namespace Larva\Transaction\Models;
 
-use Carbon\CarbonInterface;
 use Exception;
 use Larva\Transaction\Events\RefundFailed;
 use Larva\Transaction\Events\RefundSucceeded;
@@ -21,7 +20,7 @@ use think\model\relation\BelongsTo;
 
 /**
  * 退款处理模型
- * @property string $id 退款流水号
+ * @property int $id 退款流水号
  * @property int $charge_id 付款ID
  * @property string $transaction_no 网关流水号
  * @property int $amount 退款金额/单位分
@@ -41,7 +40,7 @@ use think\model\relation\BelongsTo;
  */
 class Refund extends Model
 {
-    use SoftDelete, Traits\DateTimeFormatter, Traits\UsingDatetimeAsPrimaryKey;
+    use SoftDelete, Traits\UsingDatetimeAsPrimaryKey, Traits\DateTimeFormatter;
 
     // 退款状态机
     public const STATUS_PENDING = 'PENDING';//待处理
@@ -98,6 +97,30 @@ class Refund extends Model
     protected $deleteTime = 'deleted_at';
 
     /**
+     * 交易状态，枚举值
+     * @var array|string[]
+     */
+    protected static array $statusMaps = [
+        self::STATUS_PENDING => '待处理',
+        self::STATUS_SUCCESS => '退款成功',
+        self::STATUS_CLOSED => '退款关闭',
+        self::STATUS_PROCESSING => '退款处理中',
+        self::STATUS_ABNORMAL => '退款异常',
+    ];
+
+    /**
+     * 交易状态，枚举值
+     * @var array|string[]
+     */
+    protected static array $statusDots = [
+        self::STATUS_PENDING => 'info',
+        self::STATUS_SUCCESS => 'success',
+        self::STATUS_CLOSED => 'info',
+        self::STATUS_PROCESSING => 'warning',
+        self::STATUS_ABNORMAL => 'error',
+    ];
+
+    /**
      * 新增前事件
      * @param Refund $model
      * @return void
@@ -115,11 +138,31 @@ class Refund extends Model
      */
     public static function onAfterInsert(Refund $model): void
     {
+        Charge::where('id', $model->charge_id)->increment('refunded_amount', $model->amount, ['state' => Charge::STATE_REFUND]);
         $model->gatewayHandle();
     }
 
     /**
+     * 获取 Status Label
+     * @return string[]
+     */
+    public static function getStatusMaps(): array
+    {
+        return static::$statusMaps;
+    }
+
+    /**
+     * 获取状态Dot
+     * @return string[]
+     */
+    public static function getStateDots(): array
+    {
+        return static::$statusDots;
+    }
+
+    /**
      * 关联收单
+     *
      * @return BelongsTo
      */
     public function charge(): BelongsTo
@@ -138,14 +181,54 @@ class Refund extends Model
 
     /**
      * 设置退款错误
-     * @param string $code
+     * @param string|int $code
      * @param string $desc
+     * @param array $extra
      * @return bool
      */
-    public function markFailed(string $code, string $desc): bool
+    public function markFailed($code, string $desc, array $extra = []): bool
     {
-        $succeed = $this->save(['status' => self::STATUS_ABNORMAL, 'failure' => ['code' => $code, 'desc' => $desc]]);
+        $succeed = $this->save([
+            'status' => self::STATUS_ABNORMAL,
+            'failure' => ['code' => $code, 'desc' => $desc],
+            'extra' => $extra
+        ]);
+        Charge::where('id', $this->charge_id)->decrement('refunded_amount', $this->amount);
         Event::trigger(new RefundFailed($this));
+        return $succeed;
+    }
+
+    /**
+     * 设置退款处理中
+     * @param array $extra
+     * @return bool
+     */
+    public function markProcessing(array $extra = []): bool
+    {
+        return $this->save([
+            'status' => self::STATUS_PROCESSING,
+            'extra' => $extra
+        ]);
+    }
+
+
+    /**
+     * 关闭退款
+     * @param string|int $code
+     * @param string $desc
+     * @param array $extra
+     * @return bool
+     */
+    public function markClosed($code, string $desc, array $extra = []): bool
+    {
+        $succeed = $this->save([
+            'status' => static::STATUS_CLOSED,
+            'credential' => [],
+            'failure' => ['code' => $code, 'desc' => $desc],
+            'extra' => $extra
+        ]);
+        Charge::query()->where('id', $this->charge_id)->decrement('refunded_amount', $this->amount);
+        Event::trigger(new RefundClosed($this));
         return $succeed;
     }
 
@@ -160,7 +243,12 @@ class Refund extends Model
         if ($this->succeed) {
             return true;
         }
-        $this->save(['status' => self::STATUS_SUCCESS, 'transaction_no' => $transactionNo, 'succeed_at' => $this->freshTimestamp(), 'extra' => $extra]);
+        $this->save([
+            'status' => self::STATUS_SUCCESS,
+            'transaction_no' => $transactionNo,
+            'succeed_at' => $this->freshTimestamp(),
+            'extra' => $extra
+        ]);
         Event::trigger(new RefundSucceeded($this));
         return $this->succeed;
     }
@@ -172,7 +260,7 @@ class Refund extends Model
      */
     public function gatewayHandle(): Refund
     {
-        $channel = Transaction::getGateway($this->charge->trade_channel);
+        $channel = Transaction::getChannel($this->charge->trade_channel);
         if ($this->charge->trade_channel == Transaction::CHANNEL_WECHAT) {
             $order = [
                 'out_refund_no' => $this->id,

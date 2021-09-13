@@ -44,8 +44,8 @@ use Yansongda\Supports\Collection;
  * @property array $credential 客户端支付凭证
  * @property array $failure 错误信息
  * @property array $extra 网关返回的信息
- * @property string|null $expired_at 交易结束时间
  * @property string|null $succeed_at 支付完成时间
+ * @property string|null $expired_at 过期时间
  * @property string $created_at 创建时间
  * @property string|null $updated_at 更新时间
  * @property string|null $deleted_at 软删除时间
@@ -58,13 +58,14 @@ use Yansongda\Supports\Collection;
  * @property-read bool $reversed 是否已撤销
  * @property-read bool $closed 是否已关闭
  * @property-read string $stateDesc 状态描述
- * @property-read int $refundableAmount 已退款钱数
+ * @property-read string $outTradeNo
+ * @property-read int $refundableAmount 可退款金额
  *
  * @author Tongle Xu <xutongle@gmail.com>
  */
 class Charge extends Model
 {
-    use SoftDelete, Traits\DateTimeFormatter, Traits\UsingDatetimeAsPrimaryKey;
+    use SoftDelete, Traits\UsingDatetimeAsPrimaryKey, Traits\DateTimeFormatter;
 
     public const STATE_SUCCESS = 'SUCCESS';
     public const STATE_REFUND = 'REFUND';
@@ -126,6 +127,7 @@ class Charge extends Model
         'subject' => 'string',
         'description' => 'string',
         'total_amount' => 'int',
+        'refunded_amount' => 'int',
         'currency' => 'string',
         'state' => 'string',
         'client_ip' => 'string',
@@ -176,13 +178,13 @@ class Charge extends Model
     {
         $model->id = $model->generateKey();
         $model->currency = $model->currency ?: 'CNY';
-        $model->state = self::STATE_NOTPAY;
+        $model->expired_at = $model->expired_at ?? Carbon::now()->addHours(2)->format('Y-m-d H:i:s.u');
+        $model->state = static::STATE_NOTPAY;
     }
 
     /**
      * 写入后事件
      * @param Charge $model
-     * @throws InvalidGatewayException
      */
     public static function onAfterInsert(Charge $model): void
     {
@@ -210,7 +212,7 @@ class Charge extends Model
     }
 
     /**
-     * 关联调用该功能模型
+     * 关联订单
      * @return MorphTo
      */
     public function source(): MorphTo
@@ -233,7 +235,7 @@ class Charge extends Model
      */
     public function getPaidAttr(): bool
     {
-        return $this->state == self::STATE_SUCCESS || $this->state == self::STATE_REFUND;
+        return $this->state == static::STATE_SUCCESS || $this->state == static::STATE_REFUND;
     }
 
     /**
@@ -276,7 +278,7 @@ class Charge extends Model
      * 获取可退款钱数
      * @return int
      */
-    public function getRefundedAmountAttr(): int
+    public function getRefundablAmountAttr(): int
     {
         $refundableAmount = $this->total_amount - $this->refunded_amount;
         if ($refundableAmount > 0) {
@@ -286,26 +288,12 @@ class Charge extends Model
     }
 
     /**
-     * 发起退款
-     * @param string $reason 退款原因
-     * @return Refund
-     * @throws TransactionException
+     * 获取OutTradeNo
+     * @return string
      */
-    public function refund(string $reason): Refund
+    public function getOutTradeNoAttribute(): string
     {
-        if (!$this->paid) {
-            throw new TransactionException('Not paid, no refund.');
-        } elseif ($this->refundableAmount == 0) {
-            throw new TransactionException('No refundable amount.');
-        } else {
-            /** @var Refund $refund */
-            $refund = $this->refunds()->create([
-                'charge_id' => $this->id,
-                'amount' => $this->total_amount,
-                'reason' => $reason,
-            ]);
-            return $refund;
-        }
+        return (string)$this->id;
     }
 
     /**
@@ -351,15 +339,38 @@ class Charge extends Model
     }
 
     /**
+     * 发起退款
+     * @param string $reason 退款原因
+     * @return Refund
+     * @throws TransactionException
+     */
+    public function refund(string $reason): Refund
+    {
+        if (!$this->paid) {
+            throw new TransactionException('Not paid, no refund.');
+        } elseif ($this->refundableAmount == 0) {
+            throw new TransactionException('No refundable amount.');
+        } else {
+            /** @var Refund $refund */
+            $refund = $this->refunds()->create([
+                'charge_id' => $this->id,
+                'amount' => $this->total_amount,
+                'reason' => $reason,
+            ]);
+            return $refund;
+        }
+    }
+
+    /**
      * 获取指定渠道的支付凭证
-     * @param string $channel
-     * @param string $type
-     * @param array $metadata
+     * @param string $channel 渠道
+     * @param string $type 通道类型
+     * @param array $metadata 元数据
      * @return array
      */
     public function getCredential(string $channel, string $type, array $metadata = []): array
     {
-        $this->update(['trade_channel' => $channel, 'trade_type' => $type, 'metadata' => $metadata]);
+        $this->save(['trade_channel' => $channel, 'trade_type' => $type, 'metadata' => $metadata]);
         $this->prePay();
         $this->refresh();
         return $this->credential;
@@ -372,19 +383,19 @@ class Charge extends Model
     {
         $channel = Transaction::getChannel($this->trade_channel);
         $order = [
-            'out_trade_no' => $this->id,
+            'out_trade_no' => $this->outTradeNo,
         ];
         if ($this->trade_channel == Transaction::CHANNEL_WECHAT) {
             $order['spbill_create_ip'] = $this->client_ip;
             $order['total_fee'] = $this->total_amount;//总金额，单位分
-            $order['body'] = $this->description;
+            $order['body'] = $this->description ?? $this->subject;
             if ($this->expired_at) {
                 $order['time_expire'] = Carbon::createFromTimestamp($this->expired_at)->format('YmdHis');
             }
-            if ($this->metadata['openid']) {
-                $order['openid'] = $this->metadata['openid'] ?? '';
+            if ($this->metadata && $this->metadata['openid']) {
+                $order['openid'] = $this->metadata['openid'];
             }
-            $order['notify_url'] = url('transaction.notify.charge', ['channel' => Transaction::CHANNEL_WECHAT]);
+            $order['notify_url'] = url('transaction.notify.wechat');
         } elseif ($this->trade_channel == Transaction::CHANNEL_ALIPAY) {
             $order['total_amount'] = $this->total_amount / 100;//总钱数，单位元
             $order['subject'] = $this->subject;
@@ -394,9 +405,9 @@ class Charge extends Model
             if ($this->expired_at) {
                 $order['time_expire'] = $this->expired_at;
             }
-            $order['notify_url'] = url('transaction.notify.charge', ['channel' => Transaction::CHANNEL_ALIPAY]);
+            $order['notify_url'] = url('transaction.notify.alipay');
             if ($this->trade_type == 'wap') {
-                $order['return_url'] = url('transaction.callback.charge', ['channel' => Transaction::CHANNEL_ALIPAY]);
+                $order['return_url'] = url('transaction.callback.alipay');
             }
         }
         // 获取支付凭证
