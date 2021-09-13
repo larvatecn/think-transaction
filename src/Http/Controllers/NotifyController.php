@@ -26,6 +26,7 @@ use think\Request;
 class NotifyController
 {
     /**
+     * 微信通知
      * @return Response
      * @throws \Yansongda\Pay\Exceptions\InvalidArgumentException
      * @throws \Yansongda\Pay\Exceptions\InvalidConfigException
@@ -43,7 +44,7 @@ class NotifyController
     }
 
     /**
-     *
+     * 支付宝通知
      */
     public function alipay()
     {
