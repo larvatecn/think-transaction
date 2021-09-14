@@ -14,7 +14,8 @@ declare(strict_types=1);
  */
 namespace Larva\Transaction\Models;
 
-use Carbon\CarbonInterface;
+use Larva\Transaction\Events\TransferFailed;
+use Larva\Transaction\Events\TransferSucceeded;
 use Larva\Transaction\Transaction;
 use think\facade\Event;
 use think\Model;
@@ -31,14 +32,19 @@ use think\model\relation\MorphTo;
  * @property string $currency 币种
  * @property string $description 描述
  * @property string $transaction_no 网关交易号
+ * @property int $source_id
+ * @property string $source_type
  * @property array $failure 失败信息
  * @property array $recipient 接收者
  * @property array $extra 扩展数据
  * @property string|null $succeed_at 成功时间
- * @property stringnull $deleted_at 删除时间
+ * @property string|null $deleted_at 删除时间
  * @property string $created_at 创建时间
  * @property string $updated_at 更新时间
+ *
  * @property-read boolean $succeed
+ *
+ * @property Model $source
  *
  * @author Tongle Xu <xutongle@gmail.com>
  */
@@ -64,15 +70,15 @@ class Transfer extends Model
      */
     protected $type = [
         'id' => 'int',
-        'channel' => 'string',
+        'trade_channel' => 'string',
         'status' => 'string',
         'amount' => 'int',
         'currency' => 'string',
         'description' => 'string',
         'transaction_no' => 'string',
-        'failure' => 'array',
         'recipient' => 'array',
-        'extra' => 'array'
+        'extra' => 'array',
+        'failure' => 'array',
     ];
 
     /**
@@ -138,6 +144,7 @@ class Transfer extends Model
      */
     public static function onAfterInsert(Transfer $model): void
     {
+        $model->gatewayHandle();
     }
 
     /**
@@ -218,11 +225,9 @@ class Transfer extends Model
     /**
      * 主动发送付款请求到网关
      * @return Transfer
-     * @throws \Exception
      */
     public function gatewayHandle(): Transfer
     {
-        $channel = Transaction::getChannel($this->trade_channel);
         if ($this->trade_channel == Transaction::CHANNEL_WECHAT) {
             $config = [
                 'partner_trade_no' => $this->id,
@@ -236,7 +241,7 @@ class Transfer extends Model
                 $config['re_user_name'] = $this->recipient['name'];
             }
             try {
-                $response = $channel->transfer($config);
+                $response = Transaction::wechat()->transfer($config);
                 $this->markSucceeded($response->payment_no, $response->toArray());
             } catch (\Exception $exception) {//设置付款失败
                 $this->markFailed('FAIL', $exception->getMessage());
@@ -253,7 +258,7 @@ class Transfer extends Model
                 $config['payee_real_name'] = $this->recipient['name'];
             }
             try {
-                $response = $channel->transfer($config);
+                $response = Transaction::alipay()->transfer($config);
                 $this->markSucceeded($response->payment_no, $response->toArray());
             } catch (\Exception $exception) {//设置提现失败
                 $this->markFailed('FAIL', $exception->getMessage());

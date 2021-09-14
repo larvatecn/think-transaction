@@ -16,7 +16,7 @@ namespace Larva\Transaction\Events;
 
 use Larva\Transaction\Models\Transfer;
 
-class TransferFailure
+class TransferSucceeded
 {
     /**
      * @var Transfer

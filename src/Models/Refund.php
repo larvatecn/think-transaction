@@ -14,6 +14,7 @@ declare(strict_types=1);
  */
 namespace Larva\Transaction\Models;
 
+use Carbon\CarbonInterface;
 use Exception;
 use Larva\Transaction\Events\RefundFailed;
 use Larva\Transaction\Events\RefundSucceeded;
@@ -143,7 +144,9 @@ class Refund extends Model
      */
     public static function onAfterInsert(Refund $model): void
     {
-        Charge::where('id', $model->charge_id)->increment('refunded_amount', $model->amount, ['state' => Charge::STATE_REFUND]);
+        $model->charge->refunded_amount = $model->charge->refunded_amount + $model->amount;
+        $model->charge->state = Charge::STATE_REFUND;
+        $model->charge->save();
         $model->gatewayHandle();
     }
 
@@ -198,7 +201,8 @@ class Refund extends Model
             'failure' => ['code' => $code, 'desc' => $desc],
             'extra' => $extra
         ]);
-        Charge::where('id', $this->charge_id)->decrement('refunded_amount', $this->amount);
+        $this->charge->refunded_amount = $this->charge->refunded_amount - $this->amount;
+        $this->charge->save();
         Event::trigger(new RefundFailed($this));
         return $succeed;
     }
@@ -216,7 +220,6 @@ class Refund extends Model
         ]);
     }
 
-
     /**
      * 关闭退款
      * @param string|int $code
@@ -232,7 +235,8 @@ class Refund extends Model
             'failure' => ['code' => $code, 'desc' => $desc],
             'extra' => $extra
         ]);
-        Charge::query()->where('id', $this->charge_id)->decrement('refunded_amount', $this->amount);
+        $this->charge->refunded_amount = $this->charge->refunded_amount - $this->amount;
+        $this->charge->save();
         Event::trigger(new RefundClosed($this));
         return $succeed;
     }
@@ -275,11 +279,15 @@ class Refund extends Model
                 'refund_fee_type' => $this->charge->currency,
                 'refund_desc' => $this->reason,
                 'refund_account' => 'REFUND_SOURCE_RECHARGE_FUNDS',
-                'notify_url' => url('transaction.notify.refund', ['channel' => Transaction::CHANNEL_WECHAT]),
+                'notify_url' => url('transaction.notify.refund', ['channel' => Transaction::CHANNEL_WECHAT])->domain(true)->build(),
             ];
             try {
                 $response = $channel->refund($order);
-                $this->markSucceeded($response->transaction_id, $response->toArray());
+                if (isset($response->result_code) && $response->result_code == 'SUCCESS') {
+                    $this->markSucceeded($response->transaction_id, $response->toArray());
+                } else {
+                    $this->markFailed($response->result_code, $response->return_msg, $response->toArray());
+                }
             } catch (Exception $exception) {//设置失败
                 $this->markFailed('FAIL', $exception->getMessage());
             }
