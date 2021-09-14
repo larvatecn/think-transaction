@@ -5,8 +5,13 @@
  * @link http://www.larva.com.cn/
  */
 
-declare (strict_types=1);
-
+declare(strict_types=1);
+/**
+ * This is NOT a freeware, use is subject to license terms.
+ *
+ * @copyright Copyright (c) 2010-2099 Jinan Larva Information Technology Co., Ltd.
+ * @link http://www.larva.com.cn/
+ */
 namespace Larva\Transaction\Http\Controllers;
 
 use Larva\Transaction\Transaction;
@@ -52,7 +57,7 @@ class NotifyController
         }
         return $pay->success();
     }
-    
+
     /**
      * 退款通知回调
      * @param Request $request

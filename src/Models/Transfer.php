@@ -5,17 +5,22 @@
  * @link http://www.larva.com.cn/
  */
 
-declare (strict_types=1);
-
+declare(strict_types=1);
+/**
+ * This is NOT a freeware, use is subject to license terms.
+ *
+ * @copyright Copyright (c) 2010-2099 Jinan Larva Information Technology Co., Ltd.
+ * @link http://www.larva.com.cn/
+ */
 namespace Larva\Transaction\Models;
 
-use Carbon\CarbonInterface;
 use Larva\Transaction\Events\TransferFailed;
 use Larva\Transaction\Events\TransferSucceeded;
 use Larva\Transaction\Transaction;
 use think\facade\Event;
 use think\Model;
 use think\model\concern\SoftDelete;
+use think\model\relation\MorphTo;
 
 /**
  * 企业付款模型，处理提现
@@ -158,6 +163,15 @@ class Transfer extends Model
     public static function getStateDots(): array
     {
         return static::$statusDots;
+    }
+
+    /**
+     * 多态关联
+     * @return MorphTo
+     */
+    public function source(): MorphTo
+    {
+        return $this->morphTo();
     }
 
     /**

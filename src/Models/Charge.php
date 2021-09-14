@@ -5,8 +5,13 @@
  * @link http://www.larva.com.cn/
  */
 
-declare (strict_types=1);
-
+declare(strict_types=1);
+/**
+ * This is NOT a freeware, use is subject to license terms.
+ *
+ * @copyright Copyright (c) 2010-2099 Jinan Larva Information Technology Co., Ltd.
+ * @link http://www.larva.com.cn/
+ */
 namespace Larva\Transaction\Models;
 
 use Carbon\Carbon;
@@ -387,7 +392,6 @@ class Charge extends Model
                 $order['openid'] = $this->metadata['openid'];
             }
             $order['notify_url'] = url('transaction.notify.wechat')->domain(true)->build();
-
         } elseif ($this->trade_channel == Transaction::CHANNEL_ALIPAY) {
             $order['total_amount'] = $this->total_amount / 100;//总钱数，单位元
             $order['subject'] = $this->subject;

@@ -1,5 +1,12 @@
 <?php
 
+declare(strict_types=1);
+/**
+ * This is NOT a freeware, use is subject to license terms.
+ *
+ * @copyright Copyright (c) 2010-2099 Jinan Larva Information Technology Co., Ltd.
+ * @link http://www.larva.com.cn/
+ */
 use Larva\Transaction\Models\Refund;
 use think\migration\Migrator;
 use think\migration\db\Column;
@@ -47,6 +54,5 @@ class CreateTransactionRefundsTable extends Migrator
             ])
             ->addIndex('charge_id')
             ->create();
-
     }
 }

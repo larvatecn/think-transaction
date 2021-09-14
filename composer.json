@@ -12,10 +12,17 @@
     "yansongda/pay": "^2.10",
     "larva/support": "^1.2"
   },
+  "require-dev": {
+    "friendsofphp/php-cs-fixer": "^3.1"
+  },
   "autoload": {
     "psr-4": {
       "Larva\\Transaction\\": "src"
     }
+  },
+  "scripts": {
+    "check-style": "vendor/bin/php-cs-fixer fix --using-cache=no --diff --config=.php-cs-fixer.php --dry-run --ansi",
+    "fix-style": "vendor/bin/php-cs-fixer fix --using-cache=no --config=.php-cs-fixer.php --ansi"
   },
   "extra": {
     "branch-alias": {

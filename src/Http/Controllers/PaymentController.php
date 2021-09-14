@@ -5,8 +5,13 @@
  * @link http://www.larva.com.cn/
  */
 
-declare (strict_types = 1);
-
+declare(strict_types=1);
+/**
+ * This is NOT a freeware, use is subject to license terms.
+ *
+ * @copyright Copyright (c) 2010-2099 Jinan Larva Information Technology Co., Ltd.
+ * @link http://www.larva.com.cn/
+ */
 namespace Larva\Transaction\Http\Controllers;
 
 use Larva\Transaction\Models\Charge;
@@ -57,7 +62,7 @@ class PaymentController
             }
             return view('transaction:return', ['charge' => $charge]);
         }
-        throw new ModelNotFoundException('该交易不存在！',Charge::class);
+        throw new ModelNotFoundException('该交易不存在！', Charge::class);
     }
 
     /**
@@ -72,6 +77,6 @@ class PaymentController
         if ($charge) {
             return $charge->toArray();
         }
-        throw new ModelNotFoundException('该交易不存在！',Charge::class);
+        throw new ModelNotFoundException('该交易不存在！', Charge::class);
     }
 }
