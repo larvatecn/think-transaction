@@ -9,12 +9,16 @@
 
 ## 环境需求
 
-- PHP >= 7.3.0
+- PHP >= 7.4.0
 
 ## 安装
 
-```bash
-composer require larva/think-transaction -vv
+```shell
+# yansongda/pay 2.x
+composer require "larva/think-transaction:^2.0"
+
+# yansongda/pay 3.x
+composer require "larva/think-transaction:^3.0"
 ```
 
 由于 `ThinkPHP` 不支持发布迁移文件到应用目录，所以你需要手动复制迁移文件到你应用的迁移目录后执行迁移；
@@ -23,12 +27,12 @@ composer require larva/think-transaction -vv
 事件
 ```php
 \Larva\Transaction\Events\ChargeClosed 交易已关闭
-\Larva\Transaction\Events\ChargeFailure 交易失败
-\Larva\Transaction\Events\ChargeShipped 交易已支付
-\Larva\Transaction\Events\RefundFailure 退款失败事件
-\Larva\Transaction\Events\RefundSuccess 退款成功事件
-\Larva\Transaction\Events\TransferFailure 企业付款失败事件
-\Larva\Transaction\Events\TransferShipped 企业付款成功事件
+\Larva\Transaction\Events\ChargeFailed 交易失败
+\Larva\Transaction\Events\ChargeSucceeded 交易已支付
+\Larva\Transaction\Events\RefundFailed 退款失败事件
+\Larva\Transaction\Events\RefundSucceeded 退款成功事件
+\Larva\Transaction\Events\TransferFailed 企业付款失败事件
+\Larva\Transaction\Events\TransferSucceeded 企业付款成功事件
 ```
 
 你自己的订单关联，总体思路是你自己的订单模型或者其他需要用户付款的模型，再模型创建后你应该可以用创建后事件来调用付款；
