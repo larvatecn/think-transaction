@@ -27,10 +27,9 @@ class TransactionService extends \think\Service
      */
     public function register()
     {
-
-        //$this->app->bind('transaction.alipay', function () {
-        //    return Pay::alipay(config('transaction.alipay'));
-        //});
+        $this->app->bind('transaction.alipay', function () {
+            return Pay::alipay(config('transaction.alipay'));
+        });
 
         $this->app->bind('transaction.wechat', function () {
             return Pay::wechat(config('transaction.wechat'));
@@ -47,7 +46,7 @@ class TransactionService extends \think\Service
                 //退款通知
                 $route->rule('notify/refund/:channel', NotifyController::class . "@refund", 'GET|POST')->name('transaction.notify.refund');
                 //支付回调
-                $route->rule('notify/charge/:channel',PaymentController::class . "@paymentCallback", 'GET|POST')->name('transaction.notify.charge');
+                $route->rule('notify/charge/:channel', PaymentController::class . "@paymentCallback", 'GET|POST')->name('transaction.notify.charge');
                 //支付回调(一般用于扫码付)
                 $route->get('callback/charge/:id', PaymentController::class . "@paymentSuccess")->name('transaction.success.charge');
                 //支付状态查询
