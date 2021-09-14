@@ -27,6 +27,8 @@ use think\model\concern\SoftDelete;
  * @property string $currency 币种
  * @property string $description 描述
  * @property string $transaction_no 网关交易号
+ * @property int $source_id
+ * @property string $source_type
  * @property array $failure 失败信息
  * @property array $recipient 接收者
  * @property array $extra 扩展数据
@@ -37,7 +39,7 @@ use think\model\concern\SoftDelete;
  *
  * @property-read boolean $succeed
  *
- * @property Model $order
+ * @property Model $source
  *
  * @author Tongle Xu <xutongle@gmail.com>
  */

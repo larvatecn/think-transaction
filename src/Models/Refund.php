@@ -21,7 +21,7 @@ use think\model\relation\BelongsTo;
 
 /**
  * 退款处理模型
- * @property string $id 退款流水号
+ * @property int $id 退款流水号
  * @property int $charge_id 付款ID
  * @property string $transaction_no 网关流水号
  * @property int $amount 退款金额/单位分
@@ -41,7 +41,7 @@ use think\model\relation\BelongsTo;
  */
 class Refund extends Model
 {
-    use SoftDelete, Traits\DateTimeFormatter, Traits\UsingDatetimeAsPrimaryKey;
+    use SoftDelete, Traits\UsingDatetimeAsPrimaryKey, Traits\DateTimeFormatter;
 
     // 退款状态机
     public const STATUS_PENDING = 'PENDING';//待处理
@@ -69,8 +69,8 @@ class Refund extends Model
         'amount' => 'int',
         'reason' => 'string',
         'status' => 'string',
-        'failure' => 'array',
-        'extra' => 'array'
+        'extra' => 'array',
+        'failure' => 'array'
     ];
 
     /**
@@ -98,6 +98,30 @@ class Refund extends Model
     protected $deleteTime = 'deleted_at';
 
     /**
+     * 交易状态，枚举值
+     * @var array|string[]
+     */
+    protected static array $statusMaps = [
+        self::STATUS_PENDING => '待处理',
+        self::STATUS_SUCCESS => '退款成功',
+        self::STATUS_CLOSED => '退款关闭',
+        self::STATUS_PROCESSING => '退款处理中',
+        self::STATUS_ABNORMAL => '退款异常',
+    ];
+
+    /**
+     * 交易状态，枚举值
+     * @var array|string[]
+     */
+    protected static array $statusDots = [
+        self::STATUS_PENDING => 'info',
+        self::STATUS_SUCCESS => 'success',
+        self::STATUS_CLOSED => 'info',
+        self::STATUS_PROCESSING => 'warning',
+        self::STATUS_ABNORMAL => 'error',
+    ];
+
+    /**
      * 新增前事件
      * @param Refund $model
      * @return void
@@ -117,11 +141,31 @@ class Refund extends Model
     {
         $model->charge->refunded_amount = $model->charge->refunded_amount + $model->amount;
         $model->charge->state = Charge::STATE_REFUND;
+        $model->charge->save();
         $model->gatewayHandle();
     }
 
     /**
+     * 获取 Status Label
+     * @return string[]
+     */
+    public static function getStatusMaps(): array
+    {
+        return static::$statusMaps;
+    }
+
+    /**
+     * 获取状态Dot
+     * @return string[]
+     */
+    public static function getStateDots(): array
+    {
+        return static::$statusDots;
+    }
+
+    /**
      * 关联收单
+     *
      * @return BelongsTo
      */
     public function charge(): BelongsTo
@@ -140,11 +184,12 @@ class Refund extends Model
 
     /**
      * 设置退款错误
-     * @param string $code
+     * @param string|int $code
      * @param string $desc
+     * @param array $extra
      * @return bool
      */
-    public function markFailed(string $code, string $desc, array $extra = []): bool
+    public function markFailed($code, string $desc, array $extra = []): bool
     {
         $succeed = $this->save([
             'status' => self::STATUS_ABNORMAL,
@@ -154,6 +199,40 @@ class Refund extends Model
         $this->charge->refunded_amount = $this->charge->refunded_amount - $this->amount;
         $this->charge->save();
         Event::trigger(new RefundFailed($this));
+        return $succeed;
+    }
+
+    /**
+     * 设置退款处理中
+     * @param array $extra
+     * @return bool
+     */
+    public function markProcessing(array $extra = []): bool
+    {
+        return $this->save([
+            'status' => self::STATUS_PROCESSING,
+            'extra' => $extra
+        ]);
+    }
+
+    /**
+     * 关闭退款
+     * @param string|int $code
+     * @param string $desc
+     * @param array $extra
+     * @return bool
+     */
+    public function markClosed($code, string $desc, array $extra = []): bool
+    {
+        $succeed = $this->save([
+            'status' => static::STATUS_CLOSED,
+            'credential' => [],
+            'failure' => ['code' => $code, 'desc' => $desc],
+            'extra' => $extra
+        ]);
+        $this->charge->refunded_amount = $this->charge->refunded_amount - $this->amount;
+        $this->charge->save();
+        Event::trigger(new RefundClosed($this));
         return $succeed;
     }
 
@@ -195,7 +274,7 @@ class Refund extends Model
                 'refund_fee_type' => $this->charge->currency,
                 'refund_desc' => $this->reason,
                 'refund_account' => 'REFUND_SOURCE_RECHARGE_FUNDS',
-                'notify_url' => url('transaction.notify.refund', ['channel' => Transaction::CHANNEL_WECHAT])->domain('https://api-rc.jiyuanyixue.com')->build(),
+                'notify_url' => url('transaction.notify.refund', ['channel' => Transaction::CHANNEL_WECHAT])->domain(true)->build(),
             ];
             try {
                 $response = $channel->refund($order);
