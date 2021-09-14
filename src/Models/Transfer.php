@@ -10,30 +10,34 @@ declare (strict_types=1);
 namespace Larva\Transaction\Models;
 
 use Carbon\CarbonInterface;
+use Larva\Transaction\Events\TransferFailed;
+use Larva\Transaction\Events\TransferSucceeded;
+use Larva\Transaction\Transaction;
+use think\facade\Event;
 use think\Model;
 use think\model\concern\SoftDelete;
 
 /**
  * 企业付款模型，处理提现
  *
- * @property string $id 付款单ID
- * @property string $channel 付款渠道
- * @property-read boolean $paid 是否已经转账
+ * @property int $id 付款单ID
+ * @property string $trade_channel 付款渠道
  * @property string $status 状态
- * @property mixed $source 触发源对象
  * @property int $amount 金额
  * @property string $currency 币种
- * @property string $recipient_id 接收者ID
  * @property string $description 描述
  * @property string $transaction_no 网关交易号
- * @property string $failure_msg 失败详情
- * @property array $metadata 元数据
+ * @property array $failure 失败信息
+ * @property array $recipient 接收者
  * @property array $extra 扩展数据
- * @property CarbonInterface $transferred_at 交易成功时间
- * @property CarbonInterface $deleted_at 软删除时间
- * @property CarbonInterface $created_at 创建时间
- * @property CarbonInterface $updated_at 更新时间
- * @property-read boolean $scheduled
+ * @property string|null $succeed_at 成功时间
+ * @property string|null $deleted_at 删除时间
+ * @property string $created_at 创建时间
+ * @property string $updated_at 更新时间
+ *
+ * @property-read boolean $succeed
+ *
+ * @property Model $order
  *
  * @author Tongle Xu <xutongle@gmail.com>
  */
@@ -59,15 +63,15 @@ class Transfer extends Model
      */
     protected $type = [
         'id' => 'int',
-        'channel' => 'string',
+        'trade_channel' => 'string',
         'status' => 'string',
         'amount' => 'int',
         'currency' => 'string',
         'description' => 'string',
         'transaction_no' => 'string',
-        'failure' => 'array',
         'recipient' => 'array',
-        'extra' => 'array'
+        'extra' => 'array',
+        'failure' => 'array',
     ];
 
     /**
@@ -95,6 +99,26 @@ class Transfer extends Model
     protected $deleteTime = 'deleted_at';
 
     /**
+     * 交易状态，枚举值
+     * @var array|string[]
+     */
+    protected static array $statusMaps = [
+        self::STATUS_PENDING => '待处理',
+        self::STATUS_SUCCESS => '付款成功',
+        self::STATUS_ABNORMAL => '付款异常',
+    ];
+
+    /**
+     * 交易状态，枚举值
+     * @var array|string[]
+     */
+    protected static array $statusDots = [
+        self::STATUS_PENDING => 'info',
+        self::STATUS_SUCCESS => 'success',
+        self::STATUS_ABNORMAL => 'error',
+    ];
+
+    /**
      * 新增前事件
      * @param Transfer $model
      * @return void
@@ -113,7 +137,117 @@ class Transfer extends Model
      */
     public static function onAfterInsert(Transfer $model): void
     {
-
+        $model->gatewayHandle();
     }
 
+    /**
+     * 获取 Status Label
+     * @return string[]
+     */
+    public static function getStatusMaps(): array
+    {
+        return static::$statusMaps;
+    }
+
+    /**
+     * 获取状态Dot
+     * @return string[]
+     */
+    public static function getStateDots(): array
+    {
+        return static::$statusDots;
+    }
+
+    /**
+     * 是否已付款
+     * @return bool
+     */
+    public function getSucceedAttr(): bool
+    {
+        return $this->status == self::STATUS_SUCCESS;
+    }
+
+    /**
+     * 设置已付款
+     * @param string $transactionNo
+     * @param array $extra
+     * @return bool
+     */
+    public function markSucceeded(string $transactionNo, array $extra = []): bool
+    {
+        if ($this->succeed) {
+            return true;
+        }
+        $state = $this->save([
+            'transaction_no' => $transactionNo,
+            'transferred_at' => $this->freshTimestamp(),
+            'status' => static::STATUS_SUCCESS,
+            'extra' => $extra
+        ]);
+        Event::trigger(new TransferSucceeded($this));
+        return $state;
+    }
+
+    /**
+     * 设置提现错误
+     * @param string|int $code
+     * @param string $desc
+     * @param array $extra
+     * @return bool
+     */
+    public function markFailed($code, string $desc, array $extra = []): bool
+    {
+        $state = $this->save([
+            'status' => self::STATUS_ABNORMAL,
+            'failure' => ['code' => $code, 'desc' => $desc],
+            'extra' => $extra
+        ]);
+        Event::trigger(new TransferFailed($this));
+        return $state;
+    }
+
+    /**
+     * 主动发送付款请求到网关
+     * @return Transfer
+     */
+    public function gatewayHandle(): Transfer
+    {
+        if ($this->trade_channel == Transaction::CHANNEL_WECHAT) {
+            $config = [
+                'partner_trade_no' => $this->id,
+                'openid' => $this->recipient['account'],
+                'check_name' => 'NO_CHECK',
+                'amount' => $this->amount,
+                'desc' => $this->description,
+            ];
+            if (isset($this->recipient['name'])) {
+                $config['check_name'] = 'FORCE_CHECK';
+                $config['re_user_name'] = $this->recipient['name'];
+            }
+            try {
+                $response = Transaction::wechat()->transfer($config);
+                $this->markSucceeded($response->payment_no, $response->toArray());
+            } catch (\Exception $exception) {//设置付款失败
+                $this->markFailed('FAIL', $exception->getMessage());
+            }
+        } elseif ($this->trade_channel == Transaction::CHANNEL_ALIPAY) {
+            $config = [
+                'out_biz_no' => $this->id,
+                'payee_type' => $this->recipient['account_type'],
+                'payee_account' => $this->recipient['account'],
+                'amount' => $this->amount / 100,
+                'remark' => $this->description,
+            ];
+            if (isset($this->recipient['name'])) {
+                $config['payee_real_name'] = $this->recipient['name'];
+            }
+            try {
+                $response = Transaction::alipay()->transfer($config);
+                $this->markSucceeded($response->payment_no, $response->toArray());
+            } catch (\Exception $exception) {//设置提现失败
+                $this->markFailed('FAIL', $exception->getMessage());
+            }
+        }
+        return $this;
+    }
 }
