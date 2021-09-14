@@ -136,6 +136,14 @@ class Charge extends Model
     ];
 
     /**
+     * 追加返回字段
+     * @var string[]
+     */
+    protected $append = [
+        'paid', 'refunded', 'reversed'
+    ];
+
+    /**
      * 交易状态，枚举值
      * @var array|string[]
      */
