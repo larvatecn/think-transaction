@@ -31,7 +31,7 @@ class CreateTransactionRefundsTable extends Migrator
     {
         $table = $this->table('transaction_refunds', ['id' => false, 'primary_key' => 'id']);
         $table->addColumn(Column::bigInteger('id')->setUnSigned()->setComment('退款流水号'))
-            ->addColumn('charge_id', 'integer', ['signed' => true, 'null' => true, 'comment' => '付款流水号'])
+            ->addColumn('charge_id', 'integer', ['signed' => true, 'comment' => '付款流水号'])
             ->addColumn('transaction_no', 'string', ['limit' => 64, 'null' => true, 'comment' => '网关流水号'])
             ->addColumn('amount', 'integer', ['signed' => true, 'comment' => '退款金额'])
             ->addColumn('reason', 'string', ['limit' => 127, 'null' => true, 'comment' => '退款原因'])

@@ -69,8 +69,8 @@ class Refund extends Model
         'amount' => 'int',
         'reason' => 'string',
         'status' => 'string',
-        'extra' => 'array',
-        'failure' => 'array'
+        'failure' => 'array',
+        'extra' => 'array'
     ];
 
     /**
@@ -115,6 +115,8 @@ class Refund extends Model
      */
     public static function onAfterInsert(Refund $model): void
     {
+        $model->charge->refunded_amount = $model->charge->refunded_amount + $model->amount;
+        $model->charge->state = Charge::STATE_REFUND;
         $model->gatewayHandle();
     }
 
@@ -142,9 +144,15 @@ class Refund extends Model
      * @param string $desc
      * @return bool
      */
-    public function markFailed(string $code, string $desc): bool
+    public function markFailed(string $code, string $desc, array $extra = []): bool
     {
-        $succeed = $this->save(['status' => self::STATUS_ABNORMAL, 'failure' => ['code' => $code, 'desc' => $desc]]);
+        $succeed = $this->save([
+            'status' => self::STATUS_ABNORMAL,
+            'failure' => ['code' => $code, 'desc' => $desc],
+            'extra' => $extra
+        ]);
+        $this->charge->refunded_amount = $this->charge->refunded_amount - $this->amount;
+        $this->charge->save();
         Event::trigger(new RefundFailed($this));
         return $succeed;
     }
@@ -160,7 +168,12 @@ class Refund extends Model
         if ($this->succeed) {
             return true;
         }
-        $this->save(['status' => self::STATUS_SUCCESS, 'transaction_no' => $transactionNo, 'succeed_at' => $this->freshTimestamp(), 'extra' => $extra]);
+        $this->save([
+            'status' => self::STATUS_SUCCESS,
+            'transaction_no' => $transactionNo,
+            'succeed_at' => $this->freshTimestamp(),
+            'extra' => $extra
+        ]);
         Event::trigger(new RefundSucceeded($this));
         return $this->succeed;
     }
@@ -172,7 +185,7 @@ class Refund extends Model
      */
     public function gatewayHandle(): Refund
     {
-        $channel = Transaction::getGateway($this->charge->trade_channel);
+        $channel = Transaction::getChannel($this->charge->trade_channel);
         if ($this->charge->trade_channel == Transaction::CHANNEL_WECHAT) {
             $order = [
                 'out_refund_no' => $this->id,
@@ -182,11 +195,15 @@ class Refund extends Model
                 'refund_fee_type' => $this->charge->currency,
                 'refund_desc' => $this->reason,
                 'refund_account' => 'REFUND_SOURCE_RECHARGE_FUNDS',
-                'notify_url' => url('transaction.notify.refund', ['channel' => Transaction::CHANNEL_WECHAT]),
+                'notify_url' => url('transaction.notify.refund', ['channel' => Transaction::CHANNEL_WECHAT])->domain('https://api-rc.jiyuanyixue.com')->build(),
             ];
             try {
                 $response = $channel->refund($order);
-                $this->markSucceeded($response->transaction_id, $response->toArray());
+                if (isset($response->result_code) && $response->result_code == 'SUCCESS') {
+                    $this->markSucceeded($response->transaction_id, $response->toArray());
+                } else {
+                    $this->markFailed($response->result_code, $response->return_msg, $response->toArray());
+                }
             } catch (Exception $exception) {//设置失败
                 $this->markFailed('FAIL', $exception->getMessage());
             }

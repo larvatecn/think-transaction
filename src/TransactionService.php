@@ -27,9 +27,10 @@ class TransactionService extends \think\Service
      */
     public function register()
     {
-        $this->app->bind('transaction.alipay', function () {
-            return Pay::alipay(config('transaction.alipay'));
-        });
+
+        //$this->app->bind('transaction.alipay', function () {
+        //    return Pay::alipay(config('transaction.alipay'));
+        //});
 
         $this->app->bind('transaction.wechat', function () {
             return Pay::wechat(config('transaction.wechat'));

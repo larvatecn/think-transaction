@@ -19,10 +19,10 @@ return [
 
         // optional，默认 warning；日志路径为：sys_get_temp_dir().'/logs/yansongda.pay.log'
         'log' => [
-            'file' => runtime_path('log/alipay.log'),
-            //  'level' => 'debug'
-            //  'type' => 'single', // optional, 可选 daily.
-            //  'max_file' => 30,
+            'file' => runtime_path('log') . 'alipay.log',
+//            'level' => 'debug',
+//            'type' => 'daily', // optional, 可选 daily.
+//            'max_file' => 30,
         ],
 
         // optional，设置此参数，将进入沙箱模式
@@ -49,17 +49,17 @@ return [
         'key' => env('WECHAT_KEY', ''),
 
         // 客户端证书路径，退款、红包等需要用到。请填写绝对路径，linux 请确保权限问题。pem 格式。
-        'cert_client' => '',
+        'cert_client' => config_path('wxcert') . 'apiclient_cert.pem',
 
         // 客户端秘钥路径，退款、红包等需要用到。请填写绝对路径，linux 请确保权限问题。pem 格式。
-        'cert_key' => '',
+        'cert_key' => config_path('wxcert') . 'apiclient_key.pem',
 
         // optional，默认 warning；日志路径为：sys_get_temp_dir().'/logs/yansongda.pay.log'
         'log' => [
-            'file' => runtime_path('log/wechat.log'),
-            //  'level' => 'debug'
-            //  'type' => 'single', // optional, 可选 daily.
-            //  'max_file' => 30,
+            'file' => runtime_path('log') . 'wechat.log',
+//            'level' => 'debug',
+//            'type' => 'daily', // optional, 可选 daily.
+//            'max_file' => 30,
         ],
 
         // optional

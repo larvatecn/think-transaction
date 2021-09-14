@@ -106,14 +106,6 @@ class Charge extends Model
     protected $deleteTime = 'deleted_at';
 
     /**
-     * JSON数据表字段
-     * @var array
-     */
-    protected $json = [
-        'metadata', 'credential', 'failure', 'extra'
-    ];
-
-    /**
      * 这个属性应该被转换为原生类型.
      *
      * @var array
@@ -130,9 +122,9 @@ class Charge extends Model
         'state' => 'string',
         'client_ip' => 'string',
         'metadata' => 'array',
-        'extra' => 'array',
         'credential' => 'array',
         'failure' => 'array',
+        'extra' => 'array',
         'expired_at' => 'datetime',
         'succeed_at' => 'datetime',
     ];
@@ -276,7 +268,7 @@ class Charge extends Model
      * 获取可退款钱数
      * @return int
      */
-    public function getRefundedAmountAttr(): int
+    public function getRefundableAmountAttr(): int
     {
         $refundableAmount = $this->total_amount - $this->refunded_amount;
         if ($refundableAmount > 0) {
@@ -299,7 +291,7 @@ class Charge extends Model
             throw new TransactionException('No refundable amount.');
         } else {
             /** @var Refund $refund */
-            $refund = $this->refunds()->create([
+            $refund = $this->refunds()->save([
                 'charge_id' => $this->id,
                 'amount' => $this->total_amount,
                 'reason' => $reason,
@@ -377,14 +369,14 @@ class Charge extends Model
         if ($this->trade_channel == Transaction::CHANNEL_WECHAT) {
             $order['spbill_create_ip'] = $this->client_ip;
             $order['total_fee'] = $this->total_amount;//总金额，单位分
-            $order['body'] = $this->description;
+            $order['body'] = $this->description ?? $this->subject;
             if ($this->expired_at) {
                 $order['time_expire'] = Carbon::createFromTimestamp($this->expired_at)->format('YmdHis');
             }
-            if ($this->metadata['openid']) {
+            if (isset($this->metadata['openid'])) {
                 $order['openid'] = $this->metadata['openid'] ?? '';
             }
-            $order['notify_url'] = url('transaction.notify.charge', ['channel' => Transaction::CHANNEL_WECHAT]);
+            $order['notify_url'] = url('transaction.notify.wechat');
         } elseif ($this->trade_channel == Transaction::CHANNEL_ALIPAY) {
             $order['total_amount'] = $this->total_amount / 100;//总钱数，单位元
             $order['subject'] = $this->subject;
@@ -394,7 +386,7 @@ class Charge extends Model
             if ($this->expired_at) {
                 $order['time_expire'] = $this->expired_at;
             }
-            $order['notify_url'] = url('transaction.notify.charge', ['channel' => Transaction::CHANNEL_ALIPAY]);
+            $order['notify_url'] = url('transaction.notify.alipay');
             if ($this->trade_type == 'wap') {
                 $order['return_url'] = url('transaction.callback.charge', ['channel' => Transaction::CHANNEL_ALIPAY]);
             }
