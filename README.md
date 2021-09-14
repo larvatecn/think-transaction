@@ -9,12 +9,16 @@
 
 ## 环境需求
 
-- PHP >= 7.3.0
+- PHP >= 7.4.0
 
 ## 安装
 
-```bash
-composer require larva/think-transaction -vv
+```shell
+# yansongda/pay 2.x
+composer require "larva/think-transaction:^2.0"
+
+# yansongda/pay 3.x
+composer require "larva/think-transaction:^3.0"
 ```
 
 由于 `ThinkPHP` 不支持发布迁移文件到应用目录，所以你需要手动复制迁移文件到你应用的迁移目录后执行迁移；
