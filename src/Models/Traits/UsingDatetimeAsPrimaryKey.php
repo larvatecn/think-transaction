@@ -3,9 +3,6 @@
 declare(strict_types=1);
 /**
  * This is NOT a freeware, use is subject to license terms.
- *
- * @copyright Copyright (c) 2010-2099 Jinan Larva Information Technology Co., Ltd.
- * @link http://www.larva.com.cn/
  */
 namespace Larva\Transaction\Models\Traits;
 
@@ -24,13 +21,13 @@ trait UsingDatetimeAsPrimaryKey
      */
     protected function generateKey(): string
     {
-        $i = rand(0, 9999);
+        $i = rand(0, 99);
         do {
-            if (9999 == $i) {
+            if (99 == $i) {
                 $i = 0;
             }
             $i++;
-            $id = date('YmdHis') . str_pad((string)$i, 4, '0', STR_PAD_LEFT);
+            $id = date('YmdHis') . str_pad((string)$i, 2, '0', STR_PAD_LEFT);
             $row = static::where($this->key, '=', $id)->find();
         } while ($row);
         return (string)$id;
