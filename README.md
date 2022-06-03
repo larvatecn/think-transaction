@@ -31,14 +31,15 @@ composer require "larva/think-transaction:^3.0"
 \Larva\Transaction\Events\ChargeSucceeded 交易已支付
 \Larva\Transaction\Events\RefundFailed 退款失败事件
 \Larva\Transaction\Events\RefundSucceeded 退款成功事件
-\Larva\Transaction\Events\TransferFailed 企业付款失败事件
-\Larva\Transaction\Events\TransferSucceeded 企业付款成功事件
+\Larva\Transaction\Events\TransferFailed 企业付款（提现）失败事件
+\Larva\Transaction\Events\TransferSucceeded 企业付款（提现）成功事件
 ```
 
-你自己的订单关联，总体思路是你自己的订单模型或者其他需要用户付款的模型，再模型创建后你应该可以用创建后事件来调用付款；
+你自己的订单关联参考下面的类，总体思路是你自己的订单模型或者其他需要用户付款的模型在模型创建后你可以用创建后事件来调用付款；
 需要在前端或者APP端执行付款逻辑的时候，你只需要 `$model->charge->getCredential();`
 就能获取到付款参数，带入对应的SDK即可，比如APP的SDK需要的几个参数，这里都能获取到。
-`\Larva\Transaction\Events\ChargeShipped` 事件你可以监听到付款成功的事件，你只需判断事件的source属性是否是你当前这个模型的实例即可知道是谁触发了付款并且付款成功；
+`\Larva\Transaction\Events\ChargeSucceeded` 事件你可以监听到付款成功的事件，
+你只需判断事件的source属性是否是你当前这个模型的实例即可知道是谁触发了付款并且付款成功；
 
 
 ```php
