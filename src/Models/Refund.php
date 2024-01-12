@@ -65,10 +65,10 @@ class Refund extends Model
      * @var array
      */
     protected $type = [
-        'id' => 'int',
-        'charge_id' => 'int',
+        'id' => 'integer',
+        'charge_id' => 'integer',
         'transaction_no' => 'string',
-        'amount' => 'int',
+        'amount' => 'integer',
         'reason' => 'string',
         'status' => 'string',
         'extra' => 'array',

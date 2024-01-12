@@ -113,14 +113,14 @@ class Charge extends Model
      * @var array
      */
     protected $type = [
-        'id' => 'int',
+        'id' => 'integer',
         'trade_channel' => 'string',
         'trade_type' => 'string',
         'transaction_no' => 'string',
         'subject' => 'string',
         'description' => 'string',
-        'total_amount' => 'int',
-        'refunded_amount' => 'int',
+        'total_amount' => 'integer',
+        'refunded_amount' => 'integer',
         'currency' => 'string',
         'state' => 'string',
         'client_ip' => 'string',

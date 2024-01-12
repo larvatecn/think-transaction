@@ -66,10 +66,10 @@ class Transfer extends Model
      * @var array
      */
     protected $type = [
-        'id' => 'int',
+        'id' => 'integer',
         'trade_channel' => 'string',
         'status' => 'string',
-        'amount' => 'int',
+        'amount' => 'integer',
         'currency' => 'string',
         'description' => 'string',
         'transaction_no' => 'string',

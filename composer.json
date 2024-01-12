@@ -8,9 +8,9 @@
     "php": "^7.4|^8.0",
     "ext-bcmath": "*",
     "ext-json": "*",
-    "topthink/framework": "^6.0.0",
+    "topthink/framework": "^6.0 | ^8.0",
     "yansongda/pay": "^2.10",
-    "larva/support": "^1.2"
+    "larva/support": "^1.0 | ^2.0"
   },
   "require-dev": {
     "friendsofphp/php-cs-fixer": "^3.1"
